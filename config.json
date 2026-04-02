@@ -1,0 +1,31 @@
+{
+  "database": {
+    "path": "./data/localmemory.db"
+  },
+  "vector_db": {
+    "type": "qdrant",
+    "url": "http://127.0.0.1:6333",
+    "collection": "memories"
+  },
+  "bridge": {
+    "type": "tcp",
+    "tcp_url": "127.0.0.1:8081"
+  },
+  "ai": {
+    "embedding_model": "all-MiniLM-L6-v2"
+  },
+  "decay": {
+    "lambda": 0.01
+  },
+  "server": {
+    "port": 8080
+  },
+  "cli": {
+    "default_topk": 5,
+    "default_scope": "global"
+  },
+  "agent": {
+    "id": "localmemory",
+    "name": "LocalMemory"
+  }
+}
