@@ -6,75 +6,75 @@ import (
 	"path/filepath"
 )
 
-// Config 顶层配置结构
-// 包含数据库、向量存储、桥接层、AI、衰减系数等服务配置
+// Config is the top-level configuration structure.
+// Contains database, vector store, bridge, AI, decay coefficient, and other service configurations.
 type Config struct {
-	Database  DatabaseConfig  `json:"database"`  // SQLite 数据库配置
-	VectorDB  VectorDBConfig `json:"vector_db"` // 向量数据库配置
-	Bridge    BridgeConfig    `json:"bridge"`    // Go-Python 通信配置
-	AI        AIConfig        `json:"ai"`        // AI 模型配置
-	Decay     DecayConfig     `json:"decay"`     // 记忆衰减配置
-	Server    ServerConfig    `json:"server"`     // HTTP 服务器配置
-	CLI       CLIConfig       `json:"cli"`        // CLI 默认参数配置
-	Agent     AgentConfig     `json:"agent"`      // Agent 标识配置
+	Database  DatabaseConfig  `json:"database"`  // SQLite database configuration
+	VectorDB  VectorDBConfig `json:"vector_db"` // Vector database configuration
+	Bridge    BridgeConfig   `json:"bridge"`    // Go-Python communication configuration
+	AI        AIConfig       `json:"ai"`        // AI model configuration
+	Decay     DecayConfig    `json:"decay"`     // Memory decay configuration
+	Server    ServerConfig   `json:"server"`    // HTTP server configuration
+	CLI       CLIConfig      `json:"cli"`       // CLI default parameters configuration
+	Agent     AgentConfig    `json:"agent"`     // Agent identifier configuration
 }
 
-// DatabaseConfig SQLite 数据库配置
+// DatabaseConfig holds SQLite database configuration.
 type DatabaseConfig struct {
-	Path string `json:"path"` // 数据库文件路径
+	Path string `json:"path"` // Database file path
 }
 
-// VectorDBConfig 向量数据库配置
-// 支持 qdrant 和 usearch 两种后端
+// VectorDBConfig holds vector database configuration.
+// Supports qdrant and usearch backends.
 type VectorDBConfig struct {
-	Type       string `json:"type"`       // 向量存储类型：qdrant | usearch
-	URL        string `json:"url"`        // Qdrant 服务地址
-	Collection string `json:"collection"` // 集合名称
+	Type       string `json:"type"`       // Vector store type: qdrant | usearch
+	URL        string `json:"url"`        // Qdrant service address
+	Collection string `json:"collection"` // Collection name
 }
 
-// BridgeConfig Go-Python 通信配置
-// MVP 阶段使用 TCP，生产环境可切换到 Unix Socket
+// BridgeConfig holds Go-Python communication configuration.
+// TCP is used in MVP, can switch to Unix Socket in production.
 type BridgeConfig struct {
-	Type   string `json:"type"`   // 通信类型：tcp | unix | namedpipe
-	TCPURL string `json:"tcp_url"` // TCP 连接地址
+	Type   string `json:"type"`    // Communication type: tcp | unix | namedpipe
+	TCPURL string `json:"tcp_url"` // TCP connection address
 }
 
-// AIConfig AI 模型配置
+// AIConfig holds AI model configuration.
 type AIConfig struct {
-	EmbeddingModel string `json:"embedding_model"` // Embedding 模型名称
+	EmbeddingModel string `json:"embedding_model"` // Embedding model name
 }
 
-// DecayConfig 记忆衰减配置
-// 记忆随时间自动降低权重
+// DecayConfig holds memory decay configuration.
+// Memory automatically decreases weight over time.
 type DecayConfig struct {
-	Lambda float64 `json:"lambda"` // 衰减系数，值越大衰减越快
+	Lambda float64 `json:"lambda"` // Decay coefficient, larger value means faster decay
 }
 
-// ServerConfig HTTP 服务器配置
+// ServerConfig holds HTTP server configuration.
 type ServerConfig struct {
-	Port int `json:"port"` // 监听端口
+	Port int `json:"port"` // Listen port
 }
 
-// CLIConfig CLI 默认参数配置
+// CLIConfig holds CLI default parameters configuration.
 type CLIConfig struct {
-	DefaultTopK  int    `json:"default_topk"`   // 默认返回结果数
-	DefaultScope string `json:"default_scope"`  // 默认作用域
+	DefaultTopK  int    `json:"default_topk"`   // Default result count
+	DefaultScope string `json:"default_scope"`  // Default scope
 }
 
-// AgentConfig Agent 标识配置
+// AgentConfig holds Agent identifier configuration.
 type AgentConfig struct {
-	ID   string `json:"id"`   // Agent 唯一标识
-	Name string `json:"name"` // Agent 显示名称
+	ID   string `json:"id"`   // Agent unique identifier
+	Name string `json:"name"` // Agent display name
 }
 
 var cfg *Config
 
-// Load 从指定路径加载配置文件
-// 如果 path 为空，则默认加载 ~/.localmemory/config.json
-// 如果文件不存在，返回默认配置而非错误
+// Load loads configuration from specified path.
+// If path is empty, defaults to ~/.localmemory/config.json.
+// If file doesn't exist, returns default config instead of error.
 func Load(path string) (*Config, error) {
 	if path == "" {
-		// 默认配置文件路径：~/.localmemory/config.json
+		// Default config file path: ~/.localmemory/config.json
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil, err
@@ -85,7 +85,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Default(), nil // 文件不存在返回默认配置
+			return Default(), nil // Return default config if file doesn't exist
 		}
 		return nil, err
 	}
@@ -99,8 +99,8 @@ func Load(path string) (*Config, error) {
 	return &c, nil
 }
 
-// Default 返回默认配置
-// 用于配置文件不存在时或测试场景
+// Default returns the default configuration.
+// Used when config file doesn't exist or for testing scenarios.
 func Default() *Config {
 	return &Config{
 		Database: DatabaseConfig{
@@ -135,8 +135,8 @@ func Default() *Config {
 	}
 }
 
-// Get 返回已加载的配置
-// 如果尚未加载，则返回默认配置
+// Get returns the loaded configuration.
+// Returns default config if not yet loaded.
 func Get() *Config {
 	if cfg == nil {
 		cfg = Default()

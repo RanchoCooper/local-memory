@@ -5,16 +5,16 @@ import (
 	"time"
 )
 
-// Store 记忆存储模块
-// 负责将记忆写入 SQLite 和向量存储
+// Store handles memory storage.
+// Responsible for writing memories to SQLite and vector store.
 type Store struct {
 	sqliteStore  SQLiteStoreInterface
 	vectorStore  VectorStore
 	embeddingSvc EmbeddingService
 }
 
-// SQLiteStoreInterface SQLite 存储接口
-// 抽象 SQLite 存储实现，支持测试和替换
+// SQLiteStoreInterface is the SQLite storage interface.
+// Abstracts SQLite storage implementation, supports testing and replacement.
 type SQLiteStoreInterface interface {
 	Save(m *Memory) error
 	GetByID(id string) (*Memory, error)
@@ -22,8 +22,8 @@ type SQLiteStoreInterface interface {
 	List(req *ListRequest) ([]*Memory, int, error)
 }
 
-// VectorStore 向量存储接口
-// 抽象向量存储实现，支持 Qdrant、USearch 等
+// VectorStore is the vector storage interface.
+// Abstracts vector storage implementation, supports Qdrant, USearch, etc.
 type VectorStore interface {
 	Upsert(id string, vector []float32, metadata map[string]any) error
 	Search(query []float32, topK int, filter *VectorFilter) ([]VectorResult, error)
@@ -31,28 +31,28 @@ type VectorStore interface {
 	Close() error
 }
 
-// VectorFilter 向量搜索过滤条件
+// VectorFilter represents vector search filter conditions.
 type VectorFilter struct {
 	Scope string
 	Type  string
 	Tags  []string
 }
 
-// VectorResult 向量搜索结果
+// VectorResult represents a vector search result.
 type VectorResult struct {
 	ID       string
 	Score    float64
 	Metadata map[string]any
 }
 
-// EmbeddingService 嵌入服务接口
-// 抽象 Embedding 实现，支持本地模型或 API
+// EmbeddingService is the embedding service interface.
+// Abstracts embedding implementation, supports local models or API.
 type EmbeddingService interface {
 	Embed(text string) ([]float32, error)
 	EmbedBatch(texts []string) ([][]float32, error)
 }
 
-// NewStore 创建 Store 实例
+// NewStore creates a Store instance.
 func NewStore(sqliteStore SQLiteStoreInterface, vectorStore VectorStore, embeddingSvc EmbeddingService) *Store {
 	return &Store{
 		sqliteStore:  sqliteStore,
@@ -61,23 +61,23 @@ func NewStore(sqliteStore SQLiteStoreInterface, vectorStore VectorStore, embeddi
 	}
 }
 
-// Save 保存记忆
-// 1. 生成向量嵌入
-// 2. 保存到 SQLite
-// 3. 保存到向量存储
+// Save saves a memory.
+// 1. Generate vector embedding
+// 2. Save to SQLite
+// 3. Save to vector store
 func (s *Store) Save(m *Memory) error {
-	// 检查是否启用 Evolve：同 key 记忆是否已存在
+	// Check if Evolve is enabled: whether memory with same key already exists
 	existing, err := s.sqliteStore.GetByKey(m.Key)
 	if err != nil {
 		return fmt.Errorf("failed to check existing memory: %w", err)
 	}
 
 	if existing != nil {
-		// 同 key 记忆已存在，调用 Evolve 合并
+		// Memory with same key exists, merge via Evolve
 		return s.evolveAndSave(existing, m)
 	}
 
-	// 生成向量嵌入
+	// Generate vector embedding
 	if s.embeddingSvc != nil && m.Value != "" {
 		vector, err := s.embeddingSvc.Embed(m.Value)
 		if err != nil {
@@ -86,12 +86,12 @@ func (s *Store) Save(m *Memory) error {
 		m.Embedding = vector
 	}
 
-	// 保存到 SQLite
+	// Save to SQLite
 	if err := s.sqliteStore.Save(m); err != nil {
 		return fmt.Errorf("failed to save to sqlite: %w", err)
 	}
 
-	// 保存到向量存储
+	// Save to vector store
 	if s.vectorStore != nil && len(m.Embedding) > 0 {
 		meta := s.memoryToMetadata(m)
 		if err := s.vectorStore.Upsert(m.ID, m.Embedding, meta); err != nil {
@@ -102,25 +102,25 @@ func (s *Store) Save(m *Memory) error {
 	return nil
 }
 
-// evolveAndSave 进化并保存
-// 当同 key 记忆存在时，合并两者
+// evolveAndSave evolves and saves.
+// When memory with same key exists, merges the two.
 func (s *Store) evolveAndSave(existing, new *Memory) error {
-	// 更新已有记忆的 value（追加新信息）
+	// Update existing memory's value (append new information)
 	existing.Value = existing.Value + "\n" + new.Value
 
-	// 更新置信度：取较高值，但不超过 1.0
+	// Update confidence: take higher value, but not exceeding 1.0
 	existing.Confidence = minFloat64(1.0, existing.Confidence+0.1)
 
-	// 更新时间戳
+	// Update timestamp
 	existing.UpdatedAt = time.Now().Unix()
 
-	// 合并标签
+	// Merge tags
 	existing.Tags = mergeTags(existing.Tags, new.Tags)
 
-	// 合并关联记忆
+	// Merge related memories
 	existing.RelatedIDs = mergeIDs(existing.RelatedIDs, new.RelatedIDs)
 
-	// 重新生成嵌入
+	// Regenerate embedding
 	if s.embeddingSvc != nil && existing.Value != "" {
 		vector, err := s.embeddingSvc.Embed(existing.Value)
 		if err != nil {
@@ -129,12 +129,12 @@ func (s *Store) evolveAndSave(existing, new *Memory) error {
 		existing.Embedding = vector
 	}
 
-	// 保存更新后的记忆
+	// Save updated memory
 	if err := s.sqliteStore.Save(existing); err != nil {
 		return fmt.Errorf("failed to save evolved memory: %w", err)
 	}
 
-	// 更新向量存储
+	// Update vector store
 	if s.vectorStore != nil && len(existing.Embedding) > 0 {
 		meta := s.memoryToMetadata(existing)
 		if err := s.vectorStore.Upsert(existing.ID, existing.Embedding, meta); err != nil {
@@ -145,7 +145,7 @@ func (s *Store) evolveAndSave(existing, new *Memory) error {
 	return nil
 }
 
-// memoryToMetadata 将 Memory 转换为向量存储的 metadata
+// memoryToMetadata converts Memory to vector store metadata.
 func (s *Store) memoryToMetadata(m *Memory) map[string]any {
 	return map[string]any{
 		"id":         m.ID,
@@ -157,7 +157,7 @@ func (s *Store) memoryToMetadata(m *Memory) map[string]any {
 	}
 }
 
-// mergeTags 合并标签列表
+// mergeTags merges two tag lists.
 func mergeTags(a, b []string) []string {
 	tagSet := make(map[string]bool)
 	for _, tag := range a {
@@ -173,7 +173,7 @@ func mergeTags(a, b []string) []string {
 	return result
 }
 
-// mergeIDs 合并 ID 列表
+// mergeIDs merges two ID lists.
 func mergeIDs(a, b []string) []string {
 	idSet := make(map[string]bool)
 	for _, id := range a {
@@ -189,7 +189,7 @@ func mergeIDs(a, b []string) []string {
 	return result
 }
 
-// minFloat64 返回两个浮点数的较小值
+// minFloat64 returns the smaller of two floats.
 func minFloat64(a, b float64) float64 {
 	if a < b {
 		return a

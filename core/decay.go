@@ -5,49 +5,48 @@ import (
 	"time"
 )
 
-// Decay 记忆衰减模块
-// 负责计算和应用记忆的时间衰减
+// Decay handles memory decay over time.
+// Responsible for calculating and applying temporal decay to memories.
 type Decay struct {
-	lambda float64 // 衰减系数
+	lambda float64 // Decay coefficient
 }
 
-// NewDecay 创建 Decay 实例
+// NewDecay creates a Decay instance.
 func NewDecay(lambda float64) *Decay {
 	return &Decay{
 		lambda: lambda,
 	}
 }
 
-// Calculate 计算记忆的衰减权重
-// 公式：weight = e^(-λ * Δt)
-// Δt：当前时间与创建时间的差（秒）
-// λ：衰减系数，值越大衰减越快
+// Calculate calculates the decay weight of a memory.
+// Formula: weight = e^(-λ * Δt)
+// Δt: time difference between now and creation (seconds)
+// λ: decay coefficient, larger value means faster decay
 //
-// 示例：
-//   - λ = 0.01, Δt = 1小时(3600s) → weight ≈ 0.97
-//   - λ = 0.01, Δt = 1天(86400s) → weight ≈ 0.42
-//   - λ = 0.01, Δt = 7天 → weight ≈ 0.00045
+// Examples:
+//   - λ = 0.01, Δt = 1 hour (3600s) → weight ≈ 0.97
+//   - λ = 0.01, Δt = 1 day (86400s) → weight ≈ 0.42
+//   - λ = 0.01, Δt = 7 days → weight ≈ 0.00045
 func (d *Decay) Calculate(createdAt int64) float64 {
 	delta := time.Now().Unix() - createdAt
 	return math.Exp(-d.lambda * float64(delta))
 }
 
-// CalculateWithFactor 使用自定义因子计算衰减
-// factor 用于调整衰减速度
+// CalculateWithFactor calculates decay with a custom factor.
 func (d *Decay) CalculateWithFactor(createdAt int64, factor float64) float64 {
 	delta := time.Now().Unix() - createdAt
 	return math.Exp(-d.lambda * factor * float64(delta))
 }
 
-// ApplyDecay 将衰减应用到记忆的置信度
-// 返回新的置信度
+// ApplyDecay applies decay to a memory's confidence.
+// Returns the new confidence value.
 func (d *Decay) ApplyDecay(memory *Memory) float64 {
 	decay := d.Calculate(memory.CreatedAt)
 	return memory.Confidence * decay
 }
 
-// IsExpired 判断记忆是否已过期
-// 阈值：衰减权重低于 0.1 时认为过期
+// IsExpired checks if a memory has expired.
+// Memory is considered expired when decay weight is below threshold.
 func (d *Decay) IsExpired(createdAt int64, threshold float64) bool {
 	weight := d.Calculate(createdAt)
 	return weight < threshold

@@ -10,15 +10,15 @@ import (
 	"time"
 )
 
-// QdrantConfig Qdrant 配置
+// QdrantConfig holds Qdrant configuration.
 type QdrantConfig struct {
 	URL        string
 	Collection string
 	VectorSize int
 }
 
-// QdrantStore Qdrant 向量存储实现（HTTP API 客户端）
-// 需要 Qdrant 服务运行在配置 URL
+// QdrantStore is the Qdrant vector store implementation (HTTP API client).
+// Requires Qdrant service running at the configured URL.
 type QdrantStore struct {
 	url        string
 	collection string
@@ -150,9 +150,9 @@ func (s *QdrantStore) Search(query []float32, topK int, filter *Filter) ([]Resul
 	ctx := context.Background()
 
 	searchReq := map[string]any{
-		"vector":    query,
-		"limit":     topK,
-		"with_vector": false,
+		"vector":       query,
+		"limit":        topK,
+		"with_vector":  false,
 		"with_payload": true,
 	}
 

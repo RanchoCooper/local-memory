@@ -1,6 +1,6 @@
 """
-Embedding 服务
-使用 sentence-transformers 生成向量嵌入
+Embedding Service
+Uses sentence-transformers to generate vector embeddings
 """
 
 from sentence_transformers import SentenceTransformer
@@ -10,16 +10,16 @@ import numpy as np
 
 class EmbeddingService:
     """
-    向量嵌入服务
-    支持本地模型（sentence-transformers）
+    Vector embedding service.
+    Supports local models (sentence-transformers).
     """
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         """
-        初始化 Embedding 服务
+        Initialize the embedding service.
 
         Args:
-            model_name: 模型名称，默认使用轻量快速的 all-MiniLM-L6-v2
+            model_name: Model name, defaults to lightweight and fast all-MiniLM-L6-v2
         """
         self.model_name = model_name
         self.mock = False
@@ -35,23 +35,23 @@ class EmbeddingService:
 
     @property
     def dimension(self) -> int:
-        """返回向量维度"""
+        """Returns the vector dimension"""
         if self.mock:
-            return 384  # MiniLM 的默认维度
+            return 384  # Default dimension for MiniLM
         return self._model.get_sentence_embedding_dimension()
 
     async def embed(self, text: str) -> list[float]:
         """
-        生成单个文本的向量嵌入
+        Generate vector embedding for a single text.
 
         Args:
-            text: 输入文本
+            text: Input text
 
         Returns:
-            float 列表，向量
+            List of floats representing the vector
         """
         if self.mock:
-            # 返回随机向量
+            # Return random vector
             import random
             return [random.random() for _ in range(384)]
 
@@ -60,13 +60,13 @@ class EmbeddingService:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """
-        批量生成向量嵌入
+        Batch generate vector embeddings.
 
         Args:
-            texts: 文本列表
+            texts: List of texts
 
         Returns:
-            向量列表
+            List of vectors
         """
         if self.mock:
             import random
@@ -80,13 +80,13 @@ class EmbeddingService:
 
     def encode(self, text: str) -> np.ndarray:
         """
-        同步编码接口（供内部使用）
+        Synchronous encoding interface (for internal use).
 
         Args:
-            text: 输入文本
+            text: Input text
 
         Returns:
-            numpy 向量
+            Numpy vector
         """
         if self.mock:
             import random

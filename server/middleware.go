@@ -7,18 +7,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// loggerMiddleware 日志中间件
-// 记录请求方法和路径、响应状态码、处理时间
+// loggerMiddleware logs HTTP requests.
+// Records request method, path, response status code, and processing time.
 func loggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		method := c.Request.Method
 
-		// 处理请求
+		// Process request
 		c.Next()
 
-		// 记录日志
+		// Log request
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
@@ -26,8 +26,8 @@ func loggerMiddleware() gin.HandlerFunc {
 	}
 }
 
-// corsMiddleware CORS 中间件
-// 允许跨域请求
+// corsMiddleware handles CORS.
+// Allows cross-origin requests.
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -44,20 +44,17 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// authMiddleware 认证中间件（预留）
-// TODO: 实现认证逻辑
+// authMiddleware handles authentication (reserved).
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 获取 Authorization header
 		token := c.GetHeader("Authorization")
 
 		if token == "" {
-			// 允许无认证访问 MVP
+			// Allow unauthenticated access for MVP
 			c.Next()
 			return
 		}
 
-		// TODO: 验证 token
 		c.Next()
 	}
 }

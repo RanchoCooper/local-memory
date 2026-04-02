@@ -1,6 +1,6 @@
 """
-信息提取服务
-从文本中提取结构化记忆
+Information Extractor
+Extracts structured memories from text
 """
 
 from typing import Optional
@@ -9,53 +9,53 @@ import re
 
 class MemoryExtractor:
     """
-    记忆信息提取器
-    MVP 阶段使用规则匹配，后续可接入 LLM
+    Memory information extractor.
+    MVP uses rule-based matching, can be extended with LLM in the future.
     """
 
     def __init__(self):
-        """初始化提取器"""
-        # 偏好模式
+        """Initialize the extractor"""
+        # Preference patterns
         self.preference_patterns = [
-            r"喜欢\s+(.+)",
-            r"偏好\s+(.+)",
-            r"倾向于\s+(.+)",
-            r"更喜欢\s+(.+)",
-            r"喜欢用\s+(.+)",
-            r"使用\s+(.+?)\s+编程",
+            r"like[sz]?\s+(.+)",
+            r"prefer[s]?\s+(.+)",
+            r"rather\s+(?:than\s+)?(.+)",
+            r"favorite\s+(?:thing\s+)?(.+)",
+            r"enjoys?\s+(.+)",
+            r"using\s+(.+?)\s+for\s+programming",
         ]
 
-        # 技能模式
+        # Skill patterns
         self.skill_patterns = [
-            r"擅长\s+(.+)",
-            r"会用\s+(.+)",
-            r"熟悉\s+(.+)",
-            r"掌握\s+(.+)",
+            r"good\s+at\s+(.+)",
+            r"skille[dr]\s+(.+)",
+            r"knows?\s+(.+)",
+            r"experienced\s+in\s+(.+)",
         ]
 
-        # 目标模式
+        # Goal patterns
         self.goal_patterns = [
-            r"想要\s+(.+)",
-            r"打算\s+(.+)",
-            r"计划\s+(.+)",
-            r"目标\s+(.+)",
+            r"want[s]?\s+to\s+(.+)",
+            r"plains?\s+to\s+(.+)",
+            r"going\s+to\s+(.+)",
+            r"goal\s+(?:is\s+)?(.+)",
         ]
 
     async def extract(self, text: str) -> dict:
         """
-        从文本中提取结构化记忆
+        Extract structured memory from text.
 
         Args:
-            text: 输入文本
+            text: Input text
 
         Returns:
-            包含 type, key, value, confidence 的字典
+            Dictionary containing type, key, value, confidence
         """
         text = text.strip()
 
-        # 尝试提取偏好
+        # Try to extract preference
         for pattern in self.preference_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return {
                     "type": "preference",
@@ -64,9 +64,9 @@ class MemoryExtractor:
                     "confidence": 0.9
                 }
 
-        # 尝试提取技能
+        # Try to extract skill
         for pattern in self.skill_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return {
                     "type": "skill",
@@ -75,9 +75,9 @@ class MemoryExtractor:
                     "confidence": 0.85
                 }
 
-        # 尝试提取目标
+        # Try to extract goal
         for pattern in self.goal_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return {
                     "type": "goal",
@@ -86,7 +86,7 @@ class MemoryExtractor:
                     "confidence": 0.8
                 }
 
-        # 默认作为事实
+        # Default to fact
         return {
             "type": "fact",
             "key": self._extract_key(text),
@@ -96,13 +96,13 @@ class MemoryExtractor:
 
     def _extract_key(self, text: str) -> str:
         """
-        从文本中提取 key
-        使用文本的前 N 个字符或第一个句子
+        Extract key from text.
+        Uses the first N characters or the first sentence.
         """
-        # 取前 50 个字符作为 key
+        # Use first 50 characters as key
         if len(text) > 50:
-            # 尝试在句号或逗号处截断
-            for sep in ["。", "，", ".", ","]:
+            # Try to truncate at sentence boundary
+            for sep in [".", ",", ";", ":", "!", "?"]:
                 idx = text[:50].rfind(sep)
                 if idx > 0:
                     return text[:idx+1].strip()

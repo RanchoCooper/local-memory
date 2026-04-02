@@ -5,148 +5,140 @@ import (
 	"time"
 )
 
-// Memory 记忆结构体
-// AI Agent 的基本记忆单元，包含类型、作用域、内容、关联等信息
+// Memory is the fundamental memory unit for AI agents.
+// It contains type, scope, content, associations, and other metadata.
 type Memory struct {
-	ID         string     `json:"id"`                      // 唯一标识符，UUID 格式
-	Type       MemoryType `json:"type"`                    // 记忆类型：preference(偏好) | fact(事实) | event(事件)
-	Scope      Scope      `json:"scope"`                   // 作用域：global(全局) | session(会话级) | agent(Agent 私有)
-	MediaType  MediaType  `json:"media_type"`             // 媒体类型：text(文本) | image(图像) | audio(语音) | video(视频)
-	Key        string     `json:"key"`                     // 记忆的键，用于唯一标识和检索
-	Value      string     `json:"value"`                  // 记忆的值，文本内容或媒体路径
-	Confidence float64    `json:"confidence"`              // 置信度，0.0~1.0，表示记忆的可信程度
-	RelatedIDs []string   `json:"related_ids"`            // 关联记忆 ID 列表，支持图谱式关联
-	Tags       []string   `json:"tags"`                   // 标签列表，便于分类和检索
-	Metadata   Metadata   `json:"metadata"`                // 扩展元数据，包含来源、语言、文件信息等
-	Deleted    bool       `json:"deleted"`                // 软删除标记，true 表示已删除
-	DeletedAt  int64      `json:"deleted_at"`             // 删除时间戳，Unix 时间
-	Embedding  []float32 `json:"-"`                      // 向量嵌入，内存中使用，不持久化到数据库
-	CreatedAt  int64     `json:"created_at"`             // 创建时间戳，Unix 时间
-	UpdatedAt  int64     `json:"updated_at"`             // 更新时间戳，Unix 时间
+	ID         string     `json:"id"`                      // Unique identifier, UUID format
+	Type       MemoryType `json:"type"`                    // Memory type: preference | fact | event
+	Scope      Scope      `json:"scope"`                   // Scope: global | session | agent
+	MediaType  MediaType  `json:"media_type"`             // Media type: text | image | audio | video
+	Key        string     `json:"key"`                     // Memory key for unique identification and retrieval
+	Value      string     `json:"value"`                  // Memory value, text content or media path
+	Confidence float64    `json:"confidence"`              // Confidence score, 0.0~1.0
+	RelatedIDs []string   `json:"related_ids"`            // Related memory ID list, supports graph associations
+	Tags       []string   `json:"tags"`                   // Tag list for categorization and retrieval
+	Metadata   Metadata   `json:"metadata"`                // Extended metadata: source, language, file info, etc.
+	Deleted    bool       `json:"deleted"`                // Soft delete flag, true means deleted
+	DeletedAt  int64      `json:"deleted_at"`             // Delete timestamp, Unix time
+	Embedding  []float32 `json:"-"`                      // Vector embedding, in-memory only, not persisted to database
+	CreatedAt  int64     `json:"created_at"`             // Creation timestamp, Unix time
+	UpdatedAt  int64     `json:"updated_at"`             // Update timestamp, Unix time
 }
 
-// MemoryType 记忆类型枚举
-// 用于区分不同性质的记忆，便于分类检索和管理
+// MemoryType represents the type of memory.
+// Used to distinguish different types of memories for categorization and retrieval.
 type MemoryType string
 
 const (
-	TypePreference   MemoryType = "preference"   // 用户偏好，如编程语言、设计风格等
-	TypeFact         MemoryType = "fact"         // 客观事实，如项目架构、技术栈等
-	TypeEvent        MemoryType = "event"        // 事件记录，如完成的功能、修复的 bug 等
-	TypeSkill        MemoryType = "skill"         // 技能/能力，如使用的框架、工具等
-	TypeGoal         MemoryType = "goal"          // 目标/意图，如要实现的功能等
-	TypeRelationship MemoryType = "relationship"  // 关系，如与某个模块的关联等
+	TypePreference   MemoryType = "preference"   // User preference, e.g., programming language, design style
+	TypeFact         MemoryType = "fact"         // Objective fact, e.g., project architecture, tech stack
+	TypeEvent        MemoryType = "event"        // Event record, e.g., completed features, fixed bugs
+	TypeSkill        MemoryType = "skill"         // Skill/ability, e.g., frameworks, tools used
+	TypeGoal         MemoryType = "goal"          // Goal/intent, e.g., features to implement
+	TypeRelationship MemoryType = "relationship"  // Relationship, e.g., association with a module
 )
 
-// Scope 记忆作用域枚举
-// 控制记忆的可见性和共享范围
+// Scope represents the visibility and sharing scope of memory.
 type Scope string
 
 const (
-	ScopeGlobal  Scope = "global"  // 全局共享，所有 Agent 和会话可见
-	ScopeSession Scope = "session" // 会话级，仅当前会话可见
-	ScopeAgent   Scope = "agent"  // Agent 私有，仅当前 Agent 可见
+	ScopeGlobal  Scope = "global"  // Global shared, visible to all agents and sessions
+	ScopeSession Scope = "session" // Session level, only visible in current session
+	ScopeAgent   Scope = "agent"  // Agent private, only visible to current agent
 )
 
-// MediaType 媒体类型枚举
-// MVP 阶段支持 text 和 image，语音/视频预留
+// MediaType represents the type of media content.
+// MVP supports text and image, audio/video are reserved for future.
 type MediaType string
 
 const (
-	MediaText   MediaType = "text"   // 文本（默认）
-	MediaImage  MediaType = "image"  // 图像（MVP 支持）
-	MediaAudio  MediaType = "audio"  // 语音（预留）
-	MediaVideo  MediaType = "video"  // 视频（预留）
+	MediaText   MediaType = "text"   // Text (default)
+	MediaImage  MediaType = "image"  // Image (MVP supported)
+	MediaAudio  MediaType = "audio"  // Audio (reserved)
+	MediaVideo  MediaType = "video"  // Video (reserved)
 )
 
-// Metadata 扩展元数据结构
-// 存储记忆的附加信息，如来源、关联文件等
+// Metadata contains extended information about the memory.
+// Such as source, associated files, etc.
 type Metadata struct {
-	Source     string         `json:"source,omitempty"`      // 来源：claude_code, user_input, api 等
-	Language   string         `json:"language,omitempty"`    // 内容语言，如 zh, en
-	FilePath   string         `json:"file_path,omitempty"`   // 关联文件路径
-	FileSize   int64          `json:"file_size,omitempty"`   // 文件大小（字节）
-	MimeType   string         `json:"mime_type,omitempty"`   // MIME 类型，如 image/png
-	AgentID    string         `json:"agent_id,omitempty"`    // 来源 Agent 标识
-	SessionID  string         `json:"session_id,omitempty"`  // 会话标识
-	Extra      map[string]any `json:"extra,omitempty"`       // 扩展字段，自定义键值对
+	Source     string         `json:"source,omitempty"`      // Source: claude_code, user_input, api, etc.
+	Language   string         `json:"language,omitempty"`    // Content language, e.g., zh, en
+	FilePath   string         `json:"file_path,omitempty"`   // Associated file path
+	FileSize   int64          `json:"file_size,omitempty"`   // File size in bytes
+	MimeType   string         `json:"mime_type,omitempty"`   // MIME type, e.g., image/png
+	AgentID    string         `json:"agent_id,omitempty"`    // Source agent identifier
+	SessionID  string         `json:"session_id,omitempty"`  // Session identifier
+	Extra      map[string]any `json:"extra,omitempty"`       // Extension fields, custom key-value pairs
 }
 
-// QueryRequest 语义检索请求
-// 用户通过自然语言查询记忆
+// QueryRequest represents a semantic search request.
 type QueryRequest struct {
-	Query string   `json:"query"`                      // 查询语句，自然语言描述
-	TopK  int      `json:"topk"`                       // 返回结果数量上限
-	Scope Scope    `json:"scope,omitempty"`            // 可选：限定作用域范围
-	Tags  []string `json:"tags,omitempty"`             // 可选：限定标签范围
+	Query string   `json:"query"`                      // Query text, natural language description
+	TopK  int      `json:"topk"`                       // Maximum number of results to return
+	Scope Scope    `json:"scope,omitempty"`            // Optional: scope filter
+	Tags  []string `json:"tags,omitempty"`             // Optional: tag filter
 }
 
-// QueryResult 单条检索结果
-// 包含匹配的记忆和相关性得分
+// QueryResult represents a single search result.
 type QueryResult struct {
-	Memory *Memory `json:"memory"` // 匹配到的记忆
-	Score  float64 `json:"score"`  // 相关性得分，0.0~1.0
+	Memory *Memory `json:"memory"` // Matched memory
+	Score  float64 `json:"score"`  // Relevance score, 0.0~1.0
 }
 
-// QueryResponse 语义检索响应
-// 返回检索结果列表
+// QueryResponse represents a semantic search response.
 type QueryResponse struct {
-	Results []*QueryResult `json:"results"` // 结果列表，按得分降序排列
+	Results []*QueryResult `json:"results"` // Result list, sorted by score descending
 }
 
-// ListRequest 列表查询请求
-// 用于分页列出记忆
+// ListRequest represents a list query request.
 type ListRequest struct {
-	Scope          Scope    `json:"scope,omitempty"`            // 可选：限定作用域
-	Tags           []string `json:"tags,omitempty"`             // 可选：限定标签
-	Limit          int      `json:"limit"`                      // 每页数量
-	Offset         int      `json:"offset"`                     // 偏移量
-	IncludeDeleted bool     `json:"include_deleted"`            // 是否包含已删除的记忆
+	Scope          Scope    `json:"scope,omitempty"`            // Optional: scope filter
+	Tags           []string `json:"tags,omitempty"`             // Optional: tag filter
+	Limit          int      `json:"limit"`                      // Page size
+	Offset         int      `json:"offset"`                     // Offset
+	IncludeDeleted bool     `json:"include_deleted"`            // Whether to include deleted memories
 }
 
-// ListResponse 列表查询响应
-// 返回记忆列表和总数
+// ListResponse represents a list query response.
 type ListResponse struct {
-	Memories []*Memory `json:"memories"` // 记忆列表
-	Total    int       `json:"total"`    // 记忆总数
+	Memories []*Memory `json:"memories"` // Memory list
+	Total    int       `json:"total"`    // Total count
 }
 
-// StatsResponse 统计信息响应
-// 返回记忆系统的各类统计
+// StatsResponse represents statistics information.
 type StatsResponse struct {
-	Total   int            `json:"total"`    // 记忆总数
-	ByType  map[string]int `json:"by_type"`  // 按类型统计
-	ByScope map[string]int `json:"by_scope"` // 按作用域统计
-	ByMedia map[string]int `json:"by_media"` // 按媒体类型统计
-	Deleted int            `json:"deleted"`  // 已删除记忆数
+	Total   int            `json:"total"`    // Total memory count
+	ByType  map[string]int `json:"by_type"`  // Statistics by type
+	ByScope map[string]int `json:"by_scope"` // Statistics by scope
+	ByMedia map[string]int `json:"by_media"` // Statistics by media type
+	Deleted int            `json:"deleted"`  // Deleted memory count
 }
 
-// BeforeSave 保存前的预处理
-// 自动填充 ID、时间戳、默认值等字段
+// BeforeSave performs preprocessing before saving.
+// Automatically fills ID, timestamps, default values, etc.
 func (m *Memory) BeforeSave() {
 	now := time.Now().Unix()
 	if m.ID == "" {
-		m.ID = GenerateID() // 空 ID 则自动生成 UUID
+		m.ID = GenerateID() // Generate UUID for empty ID
 	}
 	if m.CreatedAt == 0 {
-		m.CreatedAt = now // 首次保存设置创建时间
+		m.CreatedAt = now // Set creation time on first save
 	}
 	if m.UpdatedAt == 0 {
-		m.UpdatedAt = now // 首次保存设置更新时间
+		m.UpdatedAt = now // Set update time on first save
 	}
 	if m.Confidence == 0 {
-		m.Confidence = 1.0 // 默认置信度为 1.0
+		m.Confidence = 1.0 // Default confidence is 1.0
 	}
 	if m.MediaType == "" {
-		m.MediaType = MediaText // 默认媒体类型为文本
+		m.MediaType = MediaText // Default media type is text
 	}
 }
 
-// MarshalMetadata 将 Metadata 结构体序列化为 JSON 字符串
-// 用于存储到数据库的 TEXT 字段
+// MarshalMetadata serializes Metadata struct to JSON string.
 func (m *Memory) MarshalMetadata() (string, error) {
 	if len(m.Metadata.Extra) == 0 && m.Metadata.Source == "" && m.Metadata.Language == "" {
-		return "", nil // 空的 Metadata 不序列化
+		return "", nil // Skip serialization for empty Metadata
 	}
 	data, err := json.Marshal(m.Metadata)
 	if err != nil {
@@ -155,8 +147,7 @@ func (m *Memory) MarshalMetadata() (string, error) {
 	return string(data), nil
 }
 
-// UnmarshalMetadata 从 JSON 字符串反序列化为 Metadata 结构体
-// 用于从数据库读取 Metadata
+// UnmarshalMetadata deserializes JSON string to Metadata struct.
 func UnmarshalMetadata(data string) (Metadata, error) {
 	if data == "" {
 		return Metadata{}, nil
@@ -166,8 +157,7 @@ func UnmarshalMetadata(data string) (Metadata, error) {
 	return m, err
 }
 
-// MarshalRelatedIDs 将关联记忆 ID 列表序列化为 JSON 字符串
-// 用于存储到数据库的 TEXT 字段
+// MarshalRelatedIDs serializes related memory ID list to JSON string.
 func (m *Memory) MarshalRelatedIDs() (string, error) {
 	if len(m.RelatedIDs) == 0 {
 		return "", nil
@@ -179,8 +169,7 @@ func (m *Memory) MarshalRelatedIDs() (string, error) {
 	return string(data), nil
 }
 
-// UnmarshalRelatedIDs 从 JSON 字符串反序列化为关联记忆 ID 列表
-// 用于从数据库读取 RelatedIDs
+// UnmarshalRelatedIDs deserializes JSON string to related memory ID list.
 func UnmarshalRelatedIDs(data string) ([]string, error) {
 	if data == "" {
 		return nil, nil
@@ -190,8 +179,7 @@ func UnmarshalRelatedIDs(data string) ([]string, error) {
 	return ids, err
 }
 
-// MarshalTags 将标签列表序列化为 JSON 字符串
-// 用于存储到数据库的 TEXT 字段
+// MarshalTags serializes tag list to JSON string.
 func (m *Memory) MarshalTags() (string, error) {
 	if len(m.Tags) == 0 {
 		return "", nil
@@ -203,8 +191,7 @@ func (m *Memory) MarshalTags() (string, error) {
 	return string(data), nil
 }
 
-// UnmarshalTags 从 JSON 字符串反序列化为标签列表
-// 用于从数据库读取 Tags
+// UnmarshalTags deserializes JSON string to tag list.
 func UnmarshalTags(data string) ([]string, error) {
 	if data == "" {
 		return nil, nil

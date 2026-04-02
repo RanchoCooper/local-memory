@@ -4,56 +4,56 @@ import (
 	"time"
 )
 
-// Evolve 记忆进化模块
-// 负责同 key 记忆的合并和更新
+// Evolve handles memory evolution.
+// Responsible for merging and updating memories with the same key.
 type Evolve struct {
 	store *Store
 }
 
-// NewEvolve 创建 Evolve 实例
+// NewEvolve creates an Evolve instance.
 func NewEvolve(store *Store) *Evolve {
 	return &Evolve{
 		store: store,
 	}
 }
 
-// MergeOption 合并选项
+// MergeOption contains merge options.
 type MergeOption struct {
-	Strategy string // 合并策略：append | replace | max
+	Strategy string // Merge strategy: append | replace | max
 }
 
-// DefaultMergeOption 默认合并选项
+// DefaultMergeOption is the default merge option.
 var DefaultMergeOption = &MergeOption{
 	Strategy: "append",
 }
 
-// Merge 合并两个同 key 记忆
-// 1. 合并 value（追加新信息）
-// 2. 更新 confidence（取较高值 + 增量）
-// 3. 更新时间戳
-// 4. 合并标签和关联记忆
+// Merge merges two memories with the same key.
+// 1. Merge value (append new information)
+// 2. Update confidence (take higher value + increment)
+// 3. Update timestamp
+// 4. Merge tags and related memories
 func (e *Evolve) Merge(existing, new *Memory, opts *MergeOption) (*Memory, error) {
 	if opts == nil {
 		opts = DefaultMergeOption
 	}
 
-	// 合并 value
+	// Merge value
 	mergedValue := e.mergeValue(existing.Value, new.Value, opts.Strategy)
 	existing.Value = mergedValue
 
-	// 更新置信度：取较高值 + 0.1 增量
+	// Update confidence: take higher value + 0.1 increment
 	existing.Confidence = minFloat64(1.0, existing.Confidence+0.1)
 
-	// 更新时间戳
+	// Update timestamp
 	existing.UpdatedAt = time.Now().Unix()
 
-	// 合并标签
+	// Merge tags
 	existing.Tags = mergeTags(existing.Tags, new.Tags)
 
-	// 合并关联记忆（去重）
+	// Merge related memories (deduplicate)
 	existing.RelatedIDs = mergeIDs(existing.RelatedIDs, new.RelatedIDs)
 
-	// 保留更好的 metadata
+	// Keep better metadata
 	if new.Metadata.Source != "" {
 		existing.Metadata.Source = new.Metadata.Source
 	}
@@ -61,20 +61,20 @@ func (e *Evolve) Merge(existing, new *Memory, opts *MergeOption) (*Memory, error
 	return existing, nil
 }
 
-// mergeValue 合并记忆值
+// mergeValue merges memory values.
 func (e *Evolve) mergeValue(existing, new, strategy string) string {
 	switch strategy {
 	case "replace":
-		// 新值覆盖旧值
+		// New value overwrites old value
 		return new
 	case "max":
-		// 取较长的值
+		// Take the longer value
 		if len(new) > len(existing) {
 			return new
 		}
 		return existing
 	case "append":
-		// 追加新值
+		// Append new value
 		if existing == "" {
 			return new
 		}
@@ -87,8 +87,8 @@ func (e *Evolve) mergeValue(existing, new, strategy string) string {
 	}
 }
 
-// EvolveExisting 检查并进化已有记忆
-// 如果存在同 key 记忆，则合并
+// EvolveExisting checks and evolves an existing memory.
+// If a memory with the same key exists, merge them.
 func (e *Evolve) EvolveExisting(memory *Memory) (*Memory, bool, error) {
 	existing, err := e.store.sqliteStore.GetByKey(memory.Key)
 	if err != nil {
@@ -99,7 +99,7 @@ func (e *Evolve) EvolveExisting(memory *Memory) (*Memory, bool, error) {
 		return memory, false, nil
 	}
 
-	// 合并记忆
+	// Merge memories
 	merged, err := e.Merge(existing, memory, nil)
 	if err != nil {
 		return nil, false, err

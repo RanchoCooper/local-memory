@@ -6,44 +6,44 @@ import (
 	"localmemory/core"
 )
 
-// PyBridge Python 服务桥接封装
-// 实现 core.EmbeddingService 接口，供核心模块使用
+// PyBridge is a Python service bridge wrapper.
+// Implements core.EmbeddingService interface for use by core modules.
 type PyBridge struct {
 	httpBridge *HTTPBridge
 }
 
-// NewPyBridge 创建 PyBridge 实例
+// NewPyBridge creates a PyBridge instance.
 func NewPyBridge(baseURL string) *PyBridge {
 	return &PyBridge{
 		httpBridge: NewHTTPBridge(baseURL, 30),
 	}
 }
 
-// Embed 实现 EmbeddingService 接口
-// 调用 Python 服务生成向量嵌入
+// Embed implements EmbeddingService interface.
+// Calls Python service to generate vector embeddings.
 func (p *PyBridge) Embed(text string) ([]float32, error) {
 	ctx := context.Background()
 	return p.httpBridge.Embed(ctx, text)
 }
 
-// EmbedBatch 实现 EmbeddingService 接口
-// 批量调用 Python 服务生成向量嵌入
+// EmbedBatch implements EmbeddingService interface.
+// Batch calls Python service to generate vector embeddings.
 func (p *PyBridge) EmbedBatch(texts []string) ([][]float32, error) {
 	ctx := context.Background()
 	return p.httpBridge.EmbedBatch(ctx, texts)
 }
 
-// Extract 从文本中提取结构化记忆
+// Extract extracts structured memory from text.
 func (p *PyBridge) Extract(text string) (*ExtractResponse, error) {
 	ctx := context.Background()
 	return p.httpBridge.Extract(ctx, text)
 }
 
-// HealthCheck 检查 Python 服务是否可用
+// HealthCheck checks if Python service is available.
 func (p *PyBridge) HealthCheck() error {
 	ctx := context.Background()
 	return p.httpBridge.HealthCheck(ctx)
 }
 
-// Ensure EmbeddingService 接口实现检查
+// Ensure EmbeddingService interface implementation check.
 var _ core.EmbeddingService = (*PyBridge)(nil)

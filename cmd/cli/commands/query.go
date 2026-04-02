@@ -17,22 +17,22 @@ var (
 
 var QueryCmd = &cobra.Command{
 	Use:   "query <text>",
-	Short: "语义检索记忆",
-	Long: `通过自然语言查询检索相关记忆。
+	Short: "Search memories semantically",
+	Long: `Search for related memories using natural language queries.
 
-示例：
-  localmemory query "用户偏好什么语言"
-  localmemory query "项目技术栈" --topk 10 --scope global`,
+Examples:
+  localmemory query "What language does user prefer"
+  localmemory query "Project tech stack" --topk 10 --scope global`,
 
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// 初始化配置
+		// Initialize configuration
 		cfg := config.Get()
 		if cfg == nil {
 			cfg = config.Default()
 		}
 
-		// 初始化存储
+		// Initialize storage
 		sqliteStore, err := initSQLiteStore()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to init storage: %v\n", err)
@@ -40,8 +40,8 @@ var QueryCmd = &cobra.Command{
 		}
 		defer sqliteStore.Close()
 
-		// MVP 阶段：简单关键词搜索
-		// 完整的语义搜索需要 embedding 服务
+		// MVP: simple keyword search
+		// Full semantic search requires embedding service
 		searchQuery := args[0]
 		if queryTopK <= 0 {
 			queryTopK = cfg.CLI.DefaultTopK
@@ -50,7 +50,7 @@ var QueryCmd = &cobra.Command{
 			queryScope = cfg.CLI.DefaultScope
 		}
 
-		// 列出记忆并简单过滤
+		// List memories and filter by simple matching
 		listReq := &core.ListRequest{
 			Scope:  core.Scope(queryScope),
 			Limit:  100,
@@ -64,7 +64,7 @@ var QueryCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 简单关键词匹配（MVP）
+		// Simple keyword matching (MVP)
 		var matched []*core.Memory
 		for _, m := range resp.Memories {
 			if containsIgnoreCase(m.Value, searchQuery) || containsIgnoreCase(m.Key, searchQuery) {
@@ -75,7 +75,7 @@ var QueryCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("找到 %d 条相关记忆（共 %d 条）:\n\n", len(matched), resp.Total)
+		fmt.Printf("Found %d related memories (total %d):\n\n", len(matched), resp.Total)
 		for i, m := range matched {
 			fmt.Printf("%d. [%s] %s\n", i+1, m.Type, m.Key)
 			fmt.Printf("   Value: %s\n", truncate(m.Value, 100))
@@ -84,7 +84,7 @@ var QueryCmd = &cobra.Command{
 		}
 
 		if len(matched) == 0 {
-			fmt.Println("未找到相关记忆")
+			fmt.Println("No related memories found")
 		}
 	},
 }

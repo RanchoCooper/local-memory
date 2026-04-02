@@ -3,21 +3,21 @@ package core
 import "errors"
 
 var (
-	// ErrMemoryNotFound 记忆不存在
+	// ErrMemoryNotFound indicates the memory does not exist
 	ErrMemoryNotFound = errors.New("memory not found")
 
-	// ErrMemoryNotDeleted 记忆未删除，无法恢复
+	// ErrMemoryNotDeleted indicates the memory is not deleted, cannot restore
 	ErrMemoryNotDeleted = errors.New("memory not deleted")
 
-	// ErrCannotLinkToSelf 无法关联到自身
+	// ErrCannotLinkToSelf indicates cannot link a memory to itself
 	ErrCannotLinkToSelf = errors.New("cannot link memory to itself")
 
-	// ErrEmbeddingServiceRequired 需要嵌入服务
+	// ErrEmbeddingServiceRequired indicates embedding service is required
 	ErrEmbeddingServiceRequired = errors.New("embedding service is required for this operation")
 
-	// ErrVectorStoreRequired 需要向量存储
+	// ErrVectorStoreRequired indicates vector store is required
 	ErrVectorStoreRequired = errors.New("vector store is required for this operation")
 
-	// ErrInvalidVectorSize 向量维度不匹配
+	// ErrInvalidVectorSize indicates vector dimension mismatch
 	ErrInvalidVectorSize = errors.New("invalid vector size")
 )

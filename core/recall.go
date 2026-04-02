@@ -1,7 +1,7 @@
 package core
 
-// Recall 记忆检索模块
-// 负责从向量存储和 SQLite 检索记忆
+// Recall handles memory retrieval.
+// Responsible for retrieving memories from vector store and SQLite.
 type Recall struct {
 	store        *Store
 	sqliteStore  SQLiteStoreInterface
@@ -10,7 +10,7 @@ type Recall struct {
 	ranker       *Ranker
 }
 
-// NewRecall 创建 Recall 实例
+// NewRecall creates a Recall instance.
 func NewRecall(sqliteStore SQLiteStoreInterface, vectorStore VectorStore, embeddingSvc EmbeddingService, ranker *Ranker) *Recall {
 	return &Recall{
 		store:        NewStore(sqliteStore, vectorStore, embeddingSvc),
@@ -21,38 +21,38 @@ func NewRecall(sqliteStore SQLiteStoreInterface, vectorStore VectorStore, embedd
 	}
 }
 
-// Query 语义检索
-// 流程：Query Text → Embedding → Vector Search → Ranking → TopK Results
+// Query performs semantic search.
+// Flow: Query Text → Embedding → Vector Search → Ranking → TopK Results
 func (r *Recall) Query(req *QueryRequest) (*QueryResponse, error) {
-	// 如果没有 embedding 服务，返回错误
+	// Return error if no embedding service
 	if r.embeddingSvc == nil {
 		return nil, ErrEmbeddingServiceRequired
 	}
 
-	// 如果没有向量存储，返回错误
+	// Return error if no vector store
 	if r.vectorStore == nil {
 		return nil, ErrVectorStoreRequired
 	}
 
-	// 1. 将查询文本转换为向量
+	// 1. Convert query text to vector
 	queryVector, err := r.embeddingSvc.Embed(req.Query)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. 构建过滤条件
+	// 2. Build filter conditions
 	filter := &VectorFilter{
 		Scope: string(req.Scope),
 		Tags:  req.Tags,
 	}
 
-	// 3. 向量搜索
+	// 3. Vector search
 	vectorResults, err := r.vectorStore.Search(queryVector, req.TopK, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. 从 SQLite 获取完整记忆并排序
+	// 4. Get complete memories from SQLite and rank
 	var results []*QueryResult
 	for _, vr := range vectorResults {
 		memory, err := r.sqliteStore.GetByID(vr.ID)
@@ -63,7 +63,7 @@ func (r *Recall) Query(req *QueryRequest) (*QueryResponse, error) {
 			continue
 		}
 
-		// 计算最终得分
+		// Calculate final score
 		finalScore := r.ranker.CalcScore(vr.Score, memory)
 
 		results = append(results, &QueryResult{
@@ -72,10 +72,10 @@ func (r *Recall) Query(req *QueryRequest) (*QueryResponse, error) {
 		})
 	}
 
-	// 5. 按得分降序排序
+	// 5. Sort by score descending
 	r.ranker.ScoreSort(results)
 
-	// 限制返回数量
+	// Limit result count
 	if len(results) > req.TopK {
 		results = results[:req.TopK]
 	}
@@ -83,14 +83,14 @@ func (r *Recall) Query(req *QueryRequest) (*QueryResponse, error) {
 	return &QueryResponse{Results: results}, nil
 }
 
-// GetByID 根据 ID 获取记忆
+// GetByID retrieves a memory by ID.
 func (r *Recall) GetByID(id string) (*Memory, error) {
 	return r.sqliteStore.GetByID(id)
 }
 
-// List 列出记忆
+// List lists memories.
 func (r *Recall) List(req *ListRequest) (*ListResponse, error) {
-	// 设置默认值
+	// Set defaults
 	if req.Limit <= 0 {
 		req.Limit = 20
 	}

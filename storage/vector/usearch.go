@@ -9,15 +9,15 @@ import (
 	"localmemory/core"
 )
 
-// USearchConfig USearch 配置
+// USearchConfig holds USearch configuration.
 type USearchConfig struct {
 	Path        string
 	VectorSize int
 	Metric     string
 }
 
-// USearchStore USearch 向量存储实现（纯内存版本，无外部依赖）
-// 生产环境建议使用 Qdrant
+// USearchStore is an in-memory vector store implementation using pure Go (no external dependencies).
+// For production, Qdrant is recommended.
 type USearchStore struct {
 	mu         sync.RWMutex
 	vectors    map[string][]float32

@@ -12,29 +12,29 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// SQLiteStore SQLite 数据库适配器
-// 负责 Memory 元数据的持久化存储
-// 使用 WAL 模式提高并发性能，支持软删除
+// SQLiteStore is the SQLite database adapter.
+// Handles Memory metadata persistence storage.
+// Uses WAL mode for better concurrency, supports soft delete.
 type SQLiteStore struct {
 	db *sql.DB
 }
 
-// NewSQLiteStore 创建 SQLiteStore 实例
-// 自动创建数据库目录和初始化表结构
+// NewSQLiteStore creates a SQLiteStore instance.
+// Automatically creates database directory and initializes schema.
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
-	// 确保数据目录存在
+	// Ensure data directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create db directory: %w", err)
 	}
 
-	// 打开数据库连接，启用 WAL 模式和外键约束
+	// Open database connection with WAL mode and foreign key constraints
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=ON")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// 验证连接
+	// Verify connection
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
@@ -47,8 +47,8 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	return s, nil
 }
 
-// initSchema 初始化数据库表结构
-// 创建 memories 表和必要的索引
+// initSchema initializes the database schema.
+// Creates memories table and necessary indexes.
 func (s *SQLiteStore) initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS memories (
@@ -80,13 +80,13 @@ func (s *SQLiteStore) initSchema() error {
 	return err
 }
 
-// Save 保存或更新记忆
-// 使用 ON CONFLICT 实现 upsert 语义
-// 会自动调用 BeforeSave() 填充默认值
+// Save saves or updates a memory.
+// Uses ON CONFLICT for upsert semantics.
+// Automatically calls BeforeSave() to fill defaults.
 func (s *SQLiteStore) Save(m *core.Memory) error {
 	m.BeforeSave()
 
-	// 序列化复杂字段为 JSON
+	// Serialize complex fields to JSON
 	relatedIDs, _ := m.MarshalRelatedIDs()
 	tags, _ := m.MarshalTags()
 	metadata, _ := m.MarshalMetadata()
@@ -118,8 +118,8 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 	return err
 }
 
-// GetByID 根据 ID 获取单条记忆
-// 包含已删除的记忆（用于恢复场景）
+// GetByID retrieves a single memory by ID.
+// Includes deleted memories (used for recovery scenarios).
 func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 	query := `
 	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
@@ -143,7 +143,7 @@ func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 		return nil, err
 	}
 
-	// 反序列化 JSON 字段
+	// Deserialize JSON fields
 	if relatedIDs.Valid {
 		m.RelatedIDs, _ = core.UnmarshalRelatedIDs(relatedIDs.String)
 	}
@@ -157,23 +157,23 @@ func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 	return &m, nil
 }
 
-// List 分页列出记忆
-// 支持按 scope、tags 过滤，可选包含已删除记忆
-// 返回记忆列表和符合条件的总数
+// List lists memories with pagination.
+// Supports filtering by scope and tags, optionally includes deleted memories.
+// Returns memory list and total count matching conditions.
 func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 	whereClause := "WHERE 1=1"
 	args := []any{}
 
-	// 默认排除已删除记忆
+	// Exclude deleted memories by default
 	if !req.IncludeDeleted {
 		whereClause += " AND deleted = 0"
 	}
-	// 按作用域过滤
+	// Filter by scope
 	if req.Scope != "" {
 		whereClause += " AND scope = ?"
 		args = append(args, req.Scope)
 	}
-	// 按标签过滤（模糊匹配）
+	// Filter by tags (fuzzy match)
 	if len(req.Tags) > 0 {
 		for _, tag := range req.Tags {
 			whereClause += " AND tags LIKE ?"
@@ -181,14 +181,14 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 		}
 	}
 
-	// 查询总数
+	// Query total count
 	countQuery := "SELECT COUNT(*) FROM memories " + whereClause
 	var total int
 	if err := s.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// 查询列表，按更新时间降序
+	// Query list, ordered by update time descending
 	query := `
 	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
 	FROM memories
@@ -217,7 +217,7 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 			return nil, 0, err
 		}
 
-		// 反序列化 JSON 字段
+		// Deserialize JSON fields
 		if relatedIDs.Valid {
 			m.RelatedIDs, _ = core.UnmarshalRelatedIDs(relatedIDs.String)
 		}
@@ -234,25 +234,25 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 	return memories, total, nil
 }
 
-// Delete 软删除记忆
-// 设置 deleted=1 和 deleted_at 时间戳
-// 物理删除使用 HardDelete
+// Delete soft deletes a memory.
+// Sets deleted=1 and deleted_at timestamp.
+// Physical deletion uses HardDelete.
 func (s *SQLiteStore) Delete(id string) error {
 	query := `UPDATE memories SET deleted = 1, deleted_at = ? WHERE id = ?`
 	_, err := s.db.Exec(query, time.Now().Unix(), id)
 	return err
 }
 
-// HardDelete 物理删除记忆
-// 不可恢复，谨慎使用
+// HardDelete physically deletes a memory.
+// Cannot be recovered, use with caution.
 func (s *SQLiteStore) HardDelete(id string) error {
 	query := `DELETE FROM memories WHERE id = ?`
 	_, err := s.db.Exec(query, id)
 	return err
 }
 
-// GetByKey 根据 key 获取最新的非删除记忆
-// 用于 Evolve 机制：查找同 key 记忆进行合并
+// GetByKey retrieves the latest non-deleted memory by key.
+// Used for Evolve mechanism: finds memory with same key for merging.
 func (s *SQLiteStore) GetByKey(key string) (*core.Memory, error) {
 	query := `
 	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
@@ -278,7 +278,7 @@ func (s *SQLiteStore) GetByKey(key string) (*core.Memory, error) {
 		return nil, err
 	}
 
-	// 反序列化 JSON 字段
+	// Deserialize JSON fields
 	if relatedIDs.Valid {
 		m.RelatedIDs, _ = core.UnmarshalRelatedIDs(relatedIDs.String)
 	}
@@ -292,8 +292,8 @@ func (s *SQLiteStore) GetByKey(key string) (*core.Memory, error) {
 	return &m, nil
 }
 
-// GetStats 获取记忆统计信息
-// 包括总数、按类型/作用域/媒体类型分布、已删除数量
+// GetStats retrieves memory statistics.
+// Includes total count, distribution by type/scope/media type, and deleted count.
 func (s *SQLiteStore) GetStats() (*core.StatsResponse, error) {
 	stats := &core.StatsResponse{
 		ByType:  make(map[string]int),
@@ -301,19 +301,19 @@ func (s *SQLiteStore) GetStats() (*core.StatsResponse, error) {
 		ByMedia: make(map[string]int),
 	}
 
-	// 查询总数
+	// Query total count
 	totalQuery := `SELECT COUNT(*) FROM memories WHERE deleted = 0`
 	if err := s.db.QueryRow(totalQuery).Scan(&stats.Total); err != nil {
 		return nil, err
 	}
 
-	// 查询已删除数量
+	// Query deleted count
 	deletedQuery := `SELECT COUNT(*) FROM memories WHERE deleted = 1`
 	if err := s.db.QueryRow(deletedQuery).Scan(&stats.Deleted); err != nil {
 		return nil, err
 	}
 
-	// 按类型分组统计
+	// Query count grouped by type
 	typeQuery := `SELECT type, COUNT(*) FROM memories WHERE deleted = 0 GROUP BY type`
 	rows, err := s.db.Query(typeQuery)
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *SQLiteStore) GetStats() (*core.StatsResponse, error) {
 		stats.ByType[t] = count
 	}
 
-	// 按作用域分组统计
+	// Query count grouped by scope
 	scopeQuery := `SELECT scope, COUNT(*) FROM memories WHERE deleted = 0 GROUP BY scope`
 	rows, err = s.db.Query(scopeQuery)
 	if err != nil {
@@ -347,7 +347,7 @@ func (s *SQLiteStore) GetStats() (*core.StatsResponse, error) {
 		stats.ByScope[sc] = count
 	}
 
-	// 按媒体类型分组统计
+	// Query count grouped by media type
 	mediaQuery := `SELECT media_type, COUNT(*) FROM memories WHERE deleted = 0 GROUP BY media_type`
 	rows, err = s.db.Query(mediaQuery)
 	if err != nil {
@@ -367,13 +367,13 @@ func (s *SQLiteStore) GetStats() (*core.StatsResponse, error) {
 	return stats, nil
 }
 
-// Close 关闭数据库连接
+// Close closes the database connection.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
-// DB 返回底层 sql.DB 实例
-// 用于高级操作或事务管理
+// DB returns the underlying sql.DB instance.
+// Used for advanced operations or transaction management.
 func (s *SQLiteStore) DB() *sql.DB {
 	return s.db
 }

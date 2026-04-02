@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-// HTTPBridge HTTP 客户端
-// 用于 Go 与 Python AI 服务的通信
+// HTTPBridge is an HTTP client.
+// Used for communication between Go and Python AI services.
 type HTTPBridge struct {
 	baseURL    string
 	client     *http.Client
 	timeout    time.Duration
 }
 
-// NewHTTPBridge 创建 HTTPBridge 实例
+// NewHTTPBridge creates an HTTPBridge instance.
 func NewHTTPBridge(baseURL string, timeout time.Duration) *HTTPBridge {
 	if timeout == 0 {
 		timeout = 30 * time.Second
@@ -32,43 +32,43 @@ func NewHTTPBridge(baseURL string, timeout time.Duration) *HTTPBridge {
 	}
 }
 
-// EmbedRequest 嵌入请求
+// EmbedRequest represents an embedding request.
 type EmbedRequest struct {
 	Text string `json:"text"`
 }
 
-// EmbedResponse 嵌入响应
+// EmbedResponse represents an embedding response.
 type EmbedResponse struct {
 	Embedding []float32 `json:"embedding"`
 	Error     string    `json:"error,omitempty"`
 }
 
-// EmbedBatchRequest 批量嵌入请求
+// EmbedBatchRequest represents a batch embedding request.
 type EmbedBatchRequest struct {
 	Texts []string `json:"texts"`
 }
 
-// EmbedBatchResponse 批量嵌入响应
+// EmbedBatchResponse represents a batch embedding response.
 type EmbedBatchResponse struct {
 	Embeddings [][]float32 `json:"embeddings"`
 	Error      string      `json:"error,omitempty"`
 }
 
-// ExtractRequest 提取请求
+// ExtractRequest represents an extraction request.
 type ExtractRequest struct {
 	Text string `json:"text"`
 }
 
-// ExtractResponse 提取响应
+// ExtractResponse represents an extraction response.
 type ExtractResponse struct {
-	Type       string `json:"type"`
-	Key        string `json:"key"`
-	Value      string `json:"value"`
+	Type       string  `json:"type"`
+	Key        string  `json:"key"`
+	Value      string  `json:"value"`
 	Confidence float64 `json:"confidence"`
-	Error      string `json:"error,omitempty"`
+	Error      string  `json:"error,omitempty"`
 }
 
-// Embed 生成单个文本的向量嵌入
+// Embed generates vector embedding for a single text.
 func (h *HTTPBridge) Embed(ctx context.Context, text string) ([]float32, error) {
 	reqBody := EmbedRequest{Text: text}
 	body, err := json.Marshal(reqBody)
@@ -104,7 +104,7 @@ func (h *HTTPBridge) Embed(ctx context.Context, text string) ([]float32, error) 
 	return respBody.Embedding, nil
 }
 
-// EmbedBatch 批量生成向量嵌入
+// EmbedBatch generates vector embeddings in batch.
 func (h *HTTPBridge) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	reqBody := EmbedBatchRequest{Texts: texts}
 	body, err := json.Marshal(reqBody)
@@ -140,7 +140,7 @@ func (h *HTTPBridge) EmbedBatch(ctx context.Context, texts []string) ([][]float3
 	return respBody.Embeddings, nil
 }
 
-// Extract 从文本中提取结构化记忆
+// Extract extracts structured memory from text.
 func (h *HTTPBridge) Extract(ctx context.Context, text string) (*ExtractResponse, error) {
 	reqBody := ExtractRequest{Text: text}
 	body, err := json.Marshal(reqBody)
@@ -176,7 +176,7 @@ func (h *HTTPBridge) Extract(ctx context.Context, text string) (*ExtractResponse
 	return &respBody, nil
 }
 
-// HealthCheck 健康检查
+// HealthCheck performs a health check.
 func (h *HTTPBridge) HealthCheck(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", h.baseURL+"/health", nil)
 	if err != nil {

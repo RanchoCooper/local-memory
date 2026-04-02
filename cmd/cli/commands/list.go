@@ -20,23 +20,23 @@ var (
 
 var ListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出记忆",
-	Long: `列出 LocalMemory 中的记忆。
+	Short: "List memories",
+	Long: `List memories in LocalMemory.
 
-示例：
+Examples:
   localmemory list
   localmemory list --scope global
   localmemory list --limit 20 --offset 0
-  localmemory list --all  # 包含已删除的记忆`,
+  localmemory list --all  # Include deleted memories`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// 初始化配置
+		// Initialize configuration
 		cfg := config.Get()
 		if cfg == nil {
 			cfg = config.Default()
 		}
 
-		// 初始化存储
+		// Initialize storage
 		sqliteStore, err := initSQLiteStore()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to init storage: %v\n", err)
@@ -44,7 +44,7 @@ var ListCmd = &cobra.Command{
 		}
 		defer sqliteStore.Close()
 
-		// 设置默认值
+		// Set defaults
 		if listLimit <= 0 {
 			listLimit = 20
 		}
@@ -52,7 +52,7 @@ var ListCmd = &cobra.Command{
 			listScope = cfg.CLI.DefaultScope
 		}
 
-		// 构建查询请求
+		// Build query request
 		listReq := &core.ListRequest{
 			Scope:          core.Scope(listScope),
 			Limit:          listLimit,
@@ -67,17 +67,17 @@ var ListCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Printf("记忆列表（共 %d 条）:\n\n", resp.Total)
+		fmt.Printf("Memory list (%d total):\n\n", resp.Total)
 
 		if len(resp.Memories) == 0 {
-			fmt.Println("暂无记忆")
+			fmt.Println("No memories yet")
 			return
 		}
 
 		for i, m := range resp.Memories {
 			deletedMark := ""
 			if m.Deleted {
-				deletedMark = " [已删除]"
+				deletedMark = " [deleted]"
 			}
 			fmt.Printf("%d. [%s%s] %s\n", listOffset+i+1, m.Type, deletedMark, m.Key)
 			fmt.Printf("   Value: %s\n", truncate(m.Value, 80))
@@ -86,11 +86,11 @@ var ListCmd = &cobra.Command{
 			fmt.Printf("   ID: %s\n\n", m.ID)
 		}
 
-		// 分页提示
+		// Pagination hint
 		if resp.Total > listLimit {
-			fmt.Printf("显示 %d-%d 条，共 %d 条\n",
+			fmt.Printf("Showing %d-%d of %d\n",
 				listOffset+1, listOffset+len(resp.Memories), resp.Total)
-			fmt.Printf("使用 --offset %d 查看更多\n", listOffset+listLimit)
+			fmt.Printf("Use --offset %d to see more\n", listOffset+listLimit)
 		}
 	},
 }
@@ -99,10 +99,10 @@ var offsetArg string
 
 var listCmdOld = &cobra.Command{
 	Use:   "list [offset]",
-	Short: "列出记忆",
-	Long: `列出 LocalMemory 中的记忆。
+	Short: "List memories",
+	Long: `List memories in LocalMemory.
 
-示例：
+Examples:
   localmemory list
   localmemory list 10`,
 

@@ -1,6 +1,6 @@
 """
 LocalMemory AI Server
-提供 Embedding 和信息提取服务
+Provides Embedding and information extraction services
 """
 
 from fastapi import FastAPI, HTTPException
@@ -14,7 +14,7 @@ from ai.extractor import MemoryExtractor
 
 app = FastAPI(title="LocalMemory AI", version="1.0.0")
 
-# CORS 配置
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,13 +23,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 全局服务实例
+# Global service instances
 embedding_service: Optional[EmbeddingService] = None
 extractor: Optional[MemoryExtractor] = None
 
 
 def init_services():
-    """初始化 AI 服务"""
+    """Initialize AI services"""
     global embedding_service, extractor
     try:
         embedding_service = EmbeddingService()
@@ -40,7 +40,7 @@ def init_services():
         print("Running in mock mode")
 
 
-# 请求/响应模型
+# Request/Response models
 class EmbedRequest(BaseModel):
     text: str
 
@@ -79,7 +79,7 @@ class HealthResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    """健康检查"""
+    """Health check"""
     if embedding_service is None:
         init_services()
 
@@ -93,13 +93,13 @@ async def health():
 
 @app.post("/embed", response_model=EmbedResponse)
 async def embed(request: EmbedRequest):
-    """生成单个文本的向量嵌入"""
+    """Generate vector embedding for a single text"""
     try:
         if embedding_service is None:
             init_services()
 
         if embedding_service is None or embedding_service.mock:
-            # Mock 模式：返回随机向量
+            # Mock mode: return random vector
             import random
             embedding = [random.random() for _ in range(384)]
             return EmbedResponse(embedding=embedding)
@@ -112,13 +112,13 @@ async def embed(request: EmbedRequest):
 
 @app.post("/embed/batch", response_model=EmbedBatchResponse)
 async def embed_batch(request: EmbedBatchRequest):
-    """批量生成向量嵌入"""
+    """Batch generate vector embeddings"""
     try:
         if embedding_service is None:
             init_services()
 
         if embedding_service is None or embedding_service.mock:
-            # Mock 模式
+            # Mock mode
             import random
             embeddings = [
                 [random.random() for _ in range(384)]
@@ -134,7 +134,7 @@ async def embed_batch(request: EmbedBatchRequest):
 
 @app.post("/extract", response_model=ExtractResponse)
 async def extract(request: ExtractRequest):
-    """从文本中提取结构化记忆"""
+    """Extract structured memory from text"""
     try:
         if extractor is None:
             init_services()
@@ -162,7 +162,7 @@ async def extract(request: ExtractRequest):
 
 @app.get("/")
 async def root():
-    """根路径"""
+    """Root path"""
     return {"message": "LocalMemory AI Server", "version": "1.0.0"}
 
 

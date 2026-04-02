@@ -14,14 +14,14 @@ var (
 )
 
 func main() {
-	// 加载配置
+	// Load configuration
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 创建并启动服务器
+	// Create and start server
 	srv := server.NewServer(cfg)
 
 	port := cfg.Server.Port
@@ -29,11 +29,11 @@ func main() {
 		port = 8080
 	}
 
-	log.Printf("LocalMemory 服务器启动中...")
-	log.Printf("监听端口: %d", port)
-	log.Printf("API 文档: http://localhost:%d/docs", port)
+	log.Printf("LocalMemory server starting...")
+	log.Printf("Listening on port: %d", port)
+	log.Printf("API docs: http://localhost:%d/docs", port)
 
 	if err := srv.Run(fmt.Sprintf(":%d", port)); err != nil {
-		log.Fatalf("服务器启动失败: %v", err)
+		log.Fatalf("Server failed to start: %v", err)
 	}
 }

@@ -17,13 +17,13 @@ var (
 
 var ForgetCmd = &cobra.Command{
 	Use:   "forget <id>",
-	Short: "删除记忆",
-	Long: `删除 LocalMemory 中的记忆。
+	Short: "Delete a memory",
+	Long: `Delete a memory from LocalMemory.
 
-默认执行软删除，记忆可通过 ID 恢复。
-使用 --hard 执行永久删除（不可恢复）。
+Default is soft delete, memory can be recovered by ID.
+Use --hard for permanent deletion (cannot be recovered).
 
-示例：
+Examples:
   localmemory forget <memory-id>
   localmemory forget <memory-id> --hard
   localmemory forget <memory-id> --force`,
@@ -32,7 +32,7 @@ var ForgetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		memoryID := args[0]
 
-		// 初始化存储
+		// Initialize storage
 		sqliteStore, err := initSQLiteStore()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to init storage: %v\n", err)
@@ -40,14 +40,14 @@ var ForgetCmd = &cobra.Command{
 		}
 		defer sqliteStore.Close()
 
-		// 验证记忆存在
+		// Verify memory exists
 		memory, err := sqliteStore.GetByID(memoryID)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to get memory: %v\n", err)
 			os.Exit(1)
 		}
 		if memory == nil {
-			fmt.Fprintf(os.Stderr, "记忆不存在: %s\n", memoryID)
+			fmt.Fprintf(os.Stderr, "Memory not found: %s\n", memoryID)
 			os.Exit(1)
 		}
 
@@ -59,14 +59,14 @@ var ForgetCmd = &cobra.Command{
 		forget := core.NewForget(sqliteStore, nil)
 
 		if forgetHard {
-			// 永久删除
+			// Permanent deletion
 			if !forgetForce {
-				fmt.Printf("警告：永久删除记忆 '%s'，此操作不可恢复！\n", memory.Key)
-				fmt.Printf("确认删除？输入 'yes' 继续: ")
+				fmt.Printf("Warning: Permanently deleting memory '%s', this cannot be recovered!\n", memory.Key)
+				fmt.Printf("Confirm deletion? Enter 'yes' to continue: ")
 				var confirm string
 				fmt.Scanln(&confirm)
 				if confirm != "yes" {
-					fmt.Println("已取消")
+					fmt.Println("Cancelled")
 					os.Exit(0)
 				}
 			}
@@ -75,16 +75,16 @@ var ForgetCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "Failed to delete memory: %v\n", err)
 				os.Exit(1)
 			}
-			fmt.Printf("记忆已永久删除: %s\n", memoryID)
+			fmt.Printf("Memory permanently deleted: %s\n", memoryID)
 		} else {
-			// 软删除
+			// Soft delete
 			if err := forget.Delete(memoryID); err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to delete memory: %v\n", err)
 				os.Exit(1)
 			}
-			fmt.Printf("记忆已删除: %s\n", memory.Key)
+			fmt.Printf("Memory deleted: %s\n", memory.Key)
 			fmt.Printf("  ID: %s\n", memoryID)
-			fmt.Printf("  可通过 ID 恢复\n")
+			fmt.Printf("  Can be recovered by ID\n")
 		}
 	},
 }

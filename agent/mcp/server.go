@@ -11,8 +11,8 @@ import (
 	"localmemory/storage"
 )
 
-// MCPServer MCP Server 实现
-// 使用 stdio 传输协议与 Claude Code 通信
+// MCPServer implements the MCP Server.
+// Uses stdio transport protocol to communicate with Claude Code.
 type MCPServer struct {
 	cfg         *config.Config
 	sqliteStore *storage.SQLiteStore
@@ -23,7 +23,7 @@ type MCPServer struct {
 	mu         sync.Mutex
 }
 
-// NewMCPServer 创建 MCP Server 实例
+// NewMCPServer creates an MCP Server instance.
 func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	sqliteStore, err := storage.NewSQLiteStore(cfg.Database.Path)
 	if err != nil {
@@ -42,8 +42,8 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	return server, nil
 }
 
-// Run 启动 MCP Server
-// 从 stdin 读取请求，输出响应到 stdout
+// Run starts the MCP Server.
+// Reads requests from stdin, outputs responses to stdout.
 func (s *MCPServer) Run() error {
 	decoder := json.NewDecoder(os.Stdin)
 	encoder := json.NewEncoder(os.Stdout)
@@ -62,29 +62,29 @@ func (s *MCPServer) Run() error {
 	}
 }
 
-// JSONRPCRequest JSON-RPC 请求
+// JSONRPCRequest represents a JSON-RPC request.
 type JSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	Method  string          `json:"method"`
-	Params  json.RawMessage  `json:"params,omitempty"`
-	ID      interface{}      `json:"id,omitempty"`
+	Params  json.RawMessage `json:"params,omitempty"`
+	ID      interface{}     `json:"id,omitempty"`
 }
 
-// JSONRPCResponse JSON-RPC 响应
+// JSONRPCResponse represents a JSON-RPC response.
 type JSONRPCResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	Result interface{}  `json:"result,omitempty"`
-	Error  *JSONRPCError `json:"error,omitempty"`
-	ID     interface{}  `json:"id,omitempty"`
+	JSONRPC string           `json:"jsonrpc"`
+	Result interface{}       `json:"result,omitempty"`
+	Error  *JSONRPCError     `json:"error,omitempty"`
+	ID     interface{}       `json:"id,omitempty"`
 }
 
-// JSONRPCError JSON-RPC 错误
+// JSONRPCError represents a JSON-RPC error.
 type JSONRPCError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-// handleRequest 处理 JSON-RPC 请求
+// handleRequest handles JSON-RPC requests.
 func (s *MCPServer) handleRequest(req *JSONRPCRequest) *JSONRPCResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,7 +134,7 @@ func (s *MCPServer) handleRequest(req *JSONRPCRequest) *JSONRPCResponse {
 	}
 }
 
-// handleInitialize 处理初始化请求
+// handleInitialize handles initialization requests.
 func (s *MCPServer) handleInitialize(params json.RawMessage) (interface{}, error) {
 	return map[string]any{
 		"protocolVersion": "2024-11-05",
@@ -149,13 +149,13 @@ func (s *MCPServer) handleInitialize(params json.RawMessage) (interface{}, error
 	}, nil
 }
 
-// handleToolsList 处理工具列表请求
+// handleToolsList handles tool list requests.
 func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error) {
 	return map[string]any{
 		"tools": []map[string]any{
 			{
 				"name":        "memory_save",
-				"description": "保存新的记忆到 LocalMemory",
+				"description": "Save a new memory to LocalMemory",
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -171,7 +171,7 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 			},
 			{
 				"name":        "memory_query",
-				"description": "语义检索记忆",
+				"description": "Search memories semantically",
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -184,7 +184,7 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 			},
 			{
 				"name":        "memory_list",
-				"description": "列出记忆",
+				"description": "List memories",
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -195,7 +195,7 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 			},
 			{
 				"name":        "memory_forget",
-				"description": "删除记忆",
+				"description": "Delete a memory",
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -208,7 +208,7 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 	}, nil
 }
 
-// handleToolsCall 处理工具调用请求
+// handleToolsCall handles tool call requests.
 func (s *MCPServer) handleToolsCall(params json.RawMessage) (interface{}, error) {
 	var callParams struct {
 		Name      string          `json:"name"`
@@ -232,7 +232,7 @@ func (s *MCPServer) handleToolsCall(params json.RawMessage) (interface{}, error)
 	}
 }
 
-// toolMemorySave 保存记忆
+// toolMemorySave saves a memory.
 func (s *MCPServer) toolMemorySave(args json.RawMessage) (interface{}, error) {
 	var params struct {
 		Type      string   `json:"type"`
@@ -266,13 +266,13 @@ func (s *MCPServer) toolMemorySave(args json.RawMessage) (interface{}, error) {
 		"content": []map[string]any{
 			{
 				"type": "text",
-				"text": fmt.Sprintf("记忆已保存: ID=%s, Key=%s", memory.ID, memory.Key),
+				"text": fmt.Sprintf("Memory saved: ID=%s, Key=%s", memory.ID, memory.Key),
 			},
 		},
 	}, nil
 }
 
-// toolMemoryQuery 检索记忆
+// toolMemoryQuery searches memories.
 func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 	var params struct {
 		Query string `json:"query"`
@@ -298,7 +298,7 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 		return nil, err
 	}
 
-	// 简单关键词匹配
+	// Simple keyword matching
 	var results []*core.QueryResult
 	for _, m := range resp.Memories {
 		if containsString(m.Value, params.Query) || containsString(m.Key, params.Query) {
@@ -312,12 +312,12 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 		}
 	}
 
-	// 构建输出
+	// Build output
 	var text string
 	if len(results) == 0 {
-		text = "未找到相关记忆"
+		text = "No related memories found"
 	} else {
-		text = "找到以下相关记忆:\n"
+		text = "Found related memories:\n"
 		for i, r := range results {
 			text += fmt.Sprintf("%d. [%s] %s: %s\n", i+1, r.Memory.Type, r.Memory.Key, truncate(r.Memory.Value, 100))
 		}
@@ -330,7 +330,7 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 	}, nil
 }
 
-// toolMemoryList 列出记忆
+// toolMemoryList lists memories.
 func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 	var params struct {
 		Scope string `json:"scope"`
@@ -353,7 +353,7 @@ func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 		return nil, err
 	}
 
-	text := fmt.Sprintf("记忆列表（共 %d 条）:\n", resp.Total)
+	text := fmt.Sprintf("Memory list (%d total):\n", resp.Total)
 	for i, m := range resp.Memories {
 		text += fmt.Sprintf("%d. [%s] %s: %s\n", i+1, m.Type, m.Key, truncate(m.Value, 80))
 	}
@@ -365,7 +365,7 @@ func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 	}, nil
 }
 
-// toolMemoryForget 删除记忆
+// toolMemoryForget deletes a memory.
 func (s *MCPServer) toolMemoryForget(args json.RawMessage) (interface{}, error) {
 	var params struct {
 		ID string `json:"id"`
@@ -380,22 +380,22 @@ func (s *MCPServer) toolMemoryForget(args json.RawMessage) (interface{}, error) 
 
 	return map[string]any{
 		"content": []map[string]any{
-			{"type": "text", "text": fmt.Sprintf("记忆已删除: %s", params.ID)},
+			{"type": "text", "text": fmt.Sprintf("Memory deleted: %s", params.ID)},
 		},
 	}, nil
 }
 
-// handleResourcesList 处理资源列表请求
+// handleResourcesList handles resource list requests.
 func (s *MCPServer) handleResourcesList(params json.RawMessage) (interface{}, error) {
 	return map[string]any{
 		"resources": []map[string]any{
-			{"uri": "memory://all", "name": "all_memories", "description": "所有记忆", "mimeType": "application/json"},
-			{"uri": "memory://stats", "name": "memory_stats", "description": "统计信息", "mimeType": "application/json"},
+			{"uri": "memory://all", "name": "all_memories", "description": "All memories", "mimeType": "application/json"},
+			{"uri": "memory://stats", "name": "memory_stats", "description": "Statistics", "mimeType": "application/json"},
 		},
 	}, nil
 }
 
-// handleResourcesRead 处理资源读取请求
+// handleResourcesRead handles resource read requests.
 func (s *MCPServer) handleResourcesRead(params json.RawMessage) (interface{}, error) {
 	var reqParams struct {
 		URI string `json:"uri"`
@@ -431,7 +431,7 @@ func (s *MCPServer) handleResourcesRead(params json.RawMessage) (interface{}, er
 	}
 }
 
-// containsString 简单字符串包含判断
+// containsString checks if string contains substring.
 func containsString(s, substr string) bool {
 	if len(substr) > len(s) {
 		return false
@@ -444,7 +444,7 @@ func containsString(s, substr string) bool {
 	return false
 }
 
-// truncate 截断字符串
+// truncate truncates a string.
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -452,7 +452,7 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// mustMarshalJSON 强制 JSON 序列化
+// mustMarshalJSON forces JSON serialization.
 func mustMarshalJSON(v interface{}) string {
 	b, _ := json.Marshal(v)
 	return string(b)

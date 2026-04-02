@@ -10,26 +10,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Server HTTP 服务器
+// Server represents an HTTP server.
 type Server struct {
 	router *gin.Engine
 	cfg    *config.Config
 	store  *core.Store
 }
 
-// NewServer 创建 HTTP 服务器实例
+// NewServer creates an HTTP server instance.
 func NewServer(cfg *config.Config) *Server {
-	// 设置 Gin 模式
+	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
 
-	// 添加中间件
+	// Add middleware
 	router.Use(gin.Recovery())
 	router.Use(loggerMiddleware())
 	router.Use(corsMiddleware())
 
-	// 初始化存储
+	// Initialize storage
 	sqliteStore, err := storage.NewSQLiteStore(cfg.Database.Path)
 	if err != nil {
 		panic("Failed to init storage: " + err.Error())
@@ -43,40 +43,40 @@ func NewServer(cfg *config.Config) *Server {
 		store:  store,
 	}
 
-	// 注册路由
+	// Register routes
 	srv.registerRoutes()
 
 	return srv
 }
 
-// registerRoutes 注册 API 路由
+// registerRoutes registers API routes.
 func (s *Server) registerRoutes() {
-	// 健康检查
+	// Health check
 	s.router.GET("/health", s.healthHandler)
 
 	// API v1
 	v1 := s.router.Group("/api/v1")
 	{
-		// 记忆 CRUD
+		// Memory CRUD
 		v1.POST("/memories", s.createMemoryHandler)
 		v1.GET("/memories", s.listMemoriesHandler)
 		v1.GET("/memories/:id", s.getMemoryHandler)
 		v1.DELETE("/memories/:id", s.deleteMemoryHandler)
 
-		// 语义检索
+		// Semantic search
 		v1.POST("/query", s.queryHandler)
 
-		// 统计
+		// Statistics
 		v1.GET("/stats", s.statsHandler)
 	}
 }
 
-// Run 启动服务器
+// Run starts the server.
 func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-// --- 请求/响应结构 ---
+// --- Request/Response structures ---
 
 type CreateMemoryRequest struct {
 	Type       string   `json:"type"`
@@ -100,7 +100,7 @@ type APIResponse struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-// --- 处理器 ---
+// --- Handlers ---
 
 func (s *Server) healthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, APIResponse{
@@ -160,8 +160,6 @@ func (s *Server) listMemoriesHandler(c *gin.Context) {
 		Offset: offset,
 	}
 
-	// 获取 Store 的 sqliteStore（内部访问）
-	// 这里需要通过 Recall 来访问
 	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
@@ -279,7 +277,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 
 	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(s.cfg.Decay.Lambda))
 
-	// MVP：简单关键词搜索
+	// MVP: simple keyword search
 	listReq := &core.ListRequest{
 		Scope: core.Scope(req.Scope),
 		Limit: 100,
@@ -293,7 +291,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 		return
 	}
 
-	// 简单匹配
+	// Simple matching
 	var results []*core.QueryResult
 	for _, m := range resp.Memories {
 		if containsString(m.Value, req.Query) || containsString(m.Key, req.Query) {
@@ -339,7 +337,7 @@ func (s *Server) statsHandler(c *gin.Context) {
 	})
 }
 
-// containsString 简单字符串包含判断
+// containsString checks if string contains substring.
 func containsString(s, substr string) bool {
 	if len(substr) > len(s) {
 		return false

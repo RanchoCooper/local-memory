@@ -16,7 +16,7 @@ var (
 )
 
 func main() {
-	// 加载配置
+	// Load configuration
 	var err error
 	cfg, err = config.Load(cfgFile)
 	if err != nil {
@@ -24,41 +24,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 创建根命令
+	// Create root command
 	rootCmd := &cobra.Command{
 		Use:   "localmemory",
-		Short: "LocalMemory - AI Agent 的本地记忆系统",
-		Long: `LocalMemory 为 AI Agent 提供本地优先的持久化、可检索、可进化的长期记忆系统。
+		Short: "LocalMemory - Local-first memory system for AI Agents",
+		Long: `LocalMemory provides a local-first, persistent, searchable, and evolvable long-term memory system for AI Agents.
 
-支持的记忆类型：
-  - preference: 用户偏好
-  - fact: 客观事实
-  - event: 事件记录
-  - skill: 技能/能力
-  - goal: 目标/意图
+Supported memory types:
+  - preference: user preference
+  - fact: objective fact
+  - event: event record
+  - skill: skill/ability
+  - goal: goal/intent
 
-示例：
-  localmemory save "用户喜欢 Go 语言"
-  localmemory query "用户偏好什么语言"
+Examples:
+  localmemory save "User prefers Go language"
+  localmemory query "What language does user prefer"
   localmemory list --scope global
   localmemory forget <id>`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			// 重新加载配置（可能已被修改）
 			cfg, _ = config.Load(cfgFile)
 		},
 	}
 
-	// 添加全局 flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "配置文件路径 (默认: ~/.localmemory/config.json)")
+	// Add global flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file path (default: ~/.localmemory/config.json)")
 
-	// 添加子命令
+	// Add subcommands
 	rootCmd.AddCommand(commands.SaveCmd)
 	rootCmd.AddCommand(commands.QueryCmd)
 	rootCmd.AddCommand(commands.ListCmd)
 	rootCmd.AddCommand(commands.ForgetCmd)
 	rootCmd.AddCommand(commands.StatsCmd)
 
-	// 执行命令
+	// Execute command
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

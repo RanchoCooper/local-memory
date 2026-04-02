@@ -1,14 +1,14 @@
-# LocalMemory AI 模块依赖
+# LocalMemory AI Module Dependencies
 
-# Web 框架
+# Web framework
 fastapi>=0.109.0
 uvicorn>=0.27.0
 
-# Embedding 模型
+# Embedding model
 sentence-transformers>=2.3.0
 
-# 数据处理
+# Data processing
 numpy>=1.24.0
 
-# 异步处理
+# Async processing
 httpx>=0.26.0
