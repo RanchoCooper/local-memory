@@ -260,8 +260,11 @@ git clone https://github.com/yourusername/local-memory.git
 cd local-memory
 make build
 
-# Save a memory
+# Save a memory (value only, key defaults to first 50 chars)
 ./localmemory save "User prefers Go language for backend development"
+
+# Save with explicit key-value separation
+./localmemory save "language_pref" "User prefers Go language for backend"
 
 # List memories
 ./localmemory list
@@ -477,6 +480,7 @@ LOCALMEMORY_DB_PATH=./data/localmemory.db
 ```powershell
 # Download and run directly (no installation required)
 .\localmemory.exe save "User prefers Go language"
+.\localmemory.exe save "language" "User prefers Go language"
 .\localmemory.exe list
 .\localmemory.exe query Go
 .\localmemory.exe stats
@@ -492,6 +496,7 @@ LOCALMEMORY_DB_PATH=./data/localmemory.db
 # Download and make executable
 chmod +x localmemory
 ./localmemory save "User prefers Go language"
+./localmemory save "language" "User prefers Go language"
 ./localmemory list
 ./localmemory query Go
 ./localmemory stats
@@ -507,6 +512,7 @@ chmod +x localmemory
 # Download and make executable
 chmod +x localmemory
 ./localmemory save "User prefers Go language"
+./localmemory save "language" "User prefers Go language"
 ./localmemory list
 ./localmemory query Go
 ./localmemory stats
@@ -519,9 +525,14 @@ chmod +x localmemory
 ### CLI Commands
 
 ```bash
-# Save a memory
+# Save a memory (value only, key defaults to first 50 chars of value)
 localmemory save "User prefers dark mode"
-localmemory save "User is a Go developer" --type fact --scope global
+
+# Save with explicit key-value separation
+localmemory save "theme" "User prefers dark mode"
+localmemory save "language" "Go developer" --type fact --scope global
+
+# Save with additional options
 localmemory save "Image description" --type fact --media-type image
 
 # Query memories

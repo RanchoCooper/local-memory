@@ -1,6 +1,6 @@
 {
   "database": {
-    "path": "./data/localmemory.db"
+    "path": "~/code/local-memory/data/localmemory.db"
   },
   "vector_db": {
     "type": "qdrant",

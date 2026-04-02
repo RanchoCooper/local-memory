@@ -26,10 +26,11 @@ var SaveCmd = &cobra.Command{
 
 Examples:
   localmemory save "User prefers Go language"
-  localmemory save "User preference" --type preference --scope global
-  localmemory save "Image description" --type fact --media-type image`,
+  localmemory save "user_preference" "User prefers Go language"
+  localmemory save "Image description" --type fact --media-type image
+  localmemory save "key" "value" --type preference --scope global`,
 
-	Args: cobra.MinimumNArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize storage
 		sqliteStore, err := initSQLiteStore()
@@ -47,13 +48,23 @@ Examples:
 			saveType = "fact"
 		}
 
+		// Parse key-value: save <key> <value> or save <value> (key defaults to first 50 chars of value)
+		var key, value string
+		if len(args) == 2 {
+			key = args[0][:min(50, len(args[0]))]
+			value = args[1]
+		} else {
+			value = args[0]
+			key = args[0][:min(50, len(args[0]))]
+		}
+
 		// Create memory
 		memory := &core.Memory{
 			Type:      core.MemoryType(saveType),
 			Scope:     core.Scope(saveScope),
 			MediaType: core.MediaType(saveMediaType),
-			Key:       args[0][:min(50, len(args[0]))],
-			Value:     args[0],
+			Key:       key,
+			Value:     value,
 			Tags:      saveTags,
 			Metadata: core.Metadata{
 				Source: "cli",
