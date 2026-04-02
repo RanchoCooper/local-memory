@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"localmemory/config"
 	"localmemory/core"
@@ -95,25 +94,9 @@ Examples:
 	},
 }
 
-var offsetArg string
-
-var listCmdOld = &cobra.Command{
-	Use:   "list [offset]",
-	Short: "List memories",
-	Long: `List memories in LocalMemory.
-
-Examples:
-  localmemory list
-  localmemory list 10`,
-
-	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) > 0 {
-			offset, err := strconv.Atoi(args[0])
-			if err == nil {
-				listOffset = offset
-			}
-		}
-		ListCmd.Run(cmd, args)
-	},
+func init() {
+	ListCmd.Flags().BoolVar(&listAll, "all", false, "Include deleted memories")
+	ListCmd.Flags().IntVar(&listLimit, "limit", 20, "Number of memories to list")
+	ListCmd.Flags().StringVar(&listScope, "scope", "", "Scope filter (global, session, agent)")
+	ListCmd.Flags().IntVar(&listOffset, "offset", 0, "Offset for pagination")
 }

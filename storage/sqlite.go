@@ -9,7 +9,7 @@ import (
 
 	"localmemory/core"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // SQLiteStore is the SQLite database adapter.
@@ -29,7 +29,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	}
 
 	// Open database connection with WAL mode and foreign key constraints
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=ON")
+	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=ON")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

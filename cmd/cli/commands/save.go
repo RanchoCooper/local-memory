@@ -22,7 +22,7 @@ var (
 var SaveCmd = &cobra.Command{
 	Use:   "save <text>",
 	Short: "Save a memory",
-	Long:  `Save text as a memory to the LocalMemory system.
+	Long: `Save text as a memory to the LocalMemory system.
 
 Examples:
   localmemory save "User prefers Go language"
@@ -38,6 +38,14 @@ Examples:
 			os.Exit(1)
 		}
 		defer sqliteStore.Close()
+
+		// Set defaults
+		if saveScope == "" {
+			saveScope = "global"
+		}
+		if saveType == "" {
+			saveType = "fact"
+		}
 
 		// Create memory
 		memory := &core.Memory{
@@ -68,6 +76,13 @@ Examples:
 		fmt.Printf("  Scope: %s\n", memory.Scope)
 		fmt.Printf("  Created: %d\n", memory.CreatedAt)
 	},
+}
+
+func init() {
+	SaveCmd.Flags().StringVar(&saveType, "type", "", "Memory type (preference, fact, event, skill, goal)")
+	SaveCmd.Flags().StringVar(&saveScope, "scope", "", "Memory scope (global, session, agent)")
+	SaveCmd.Flags().StringVar(&saveMediaType, "media-type", "text", "Media type (text, image)")
+	SaveCmd.Flags().StringArrayVar(&saveTags, "tag", []string{}, "Tags for the memory")
 }
 
 func initSQLiteStore() (*storage.SQLiteStore, error) {

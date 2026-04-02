@@ -89,6 +89,11 @@ Examples:
 	},
 }
 
+func init() {
+	QueryCmd.Flags().IntVar(&queryTopK, "topk", 5, "Number of results to return")
+	QueryCmd.Flags().StringVar(&queryScope, "scope", "", "Scope filter (global, session, agent)")
+}
+
 func containsIgnoreCase(s, substr string) bool {
 	return len(s) >= len(substr) && containsLower(s, substr)
 }

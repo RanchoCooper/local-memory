@@ -88,3 +88,8 @@ Examples:
 		}
 	},
 }
+
+func init() {
+	ForgetCmd.Flags().BoolVar(&forgetHard, "hard", false, "Permanently delete the memory")
+	ForgetCmd.Flags().BoolVar(&forgetForce, "force", false, "Skip confirmation prompt")
+}
