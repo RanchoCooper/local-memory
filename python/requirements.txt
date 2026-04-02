@@ -1,0 +1,14 @@
+# LocalMemory AI 模块依赖
+
+# Web 框架
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Embedding 模型
+sentence-transformers>=2.3.0
+
+# 数据处理
+numpy>=1.24.0
+
+# 异步处理
+httpx>=0.26.0
