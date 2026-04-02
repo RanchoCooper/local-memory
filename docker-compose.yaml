@@ -1,0 +1,74 @@
+# LocalMemory docker-compose.yaml
+# Local-first memory system for AI Agents
+
+services:
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: localmemory-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Python AI Service (Embedding + Extractor)
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ai-service
+    container_name: localmemory-ai
+    ports:
+      - "8081:8081"
+    environment:
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
+    volumes:
+      - ./data/models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # LocalMemory HTTP Server
+  localmemory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: final
+    container_name: localmemory-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - CONFIG__DATABASE__PATH=/data/localmemory.db
+      - CONFIG__VECTOR_DB__URL=http://qdrant:6333
+      - CONFIG__BRIDGE__TCP_URL=http://ai-service:8081
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+    driver: local
+
+networks:
+  default:
+    name: localmemory-network
