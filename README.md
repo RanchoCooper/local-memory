@@ -1,4 +1,4 @@
-# LocalMemory
+# Local Memory
 
 **A local-first memory layer for AI agents**
 
@@ -437,6 +437,52 @@ LOCALMEMORY_DB_PATH=./data/localmemory.db
 ---
 
 ## Usage
+
+### Quick Start by Platform
+
+#### Windows
+
+```powershell
+# Download and run directly (no installation required)
+.\localmemory.exe save "User prefers Go language"
+.\localmemory.exe list
+.\localmemory.exe query Go
+.\localmemory.exe stats
+.\localmemory.exe forget <memory-id>
+
+# Start HTTP server
+.\localmemory-server.exe
+```
+
+#### Linux
+
+```bash
+# Download and make executable
+chmod +x localmemory
+./localmemory save "User prefers Go language"
+./localmemory list
+./localmemory query Go
+./localmemory stats
+./localmemory forget <memory-id>
+
+# Start HTTP server
+./localmemory-server &
+```
+
+#### macOS
+
+```bash
+# Download and make executable
+chmod +x localmemory
+./localmemory save "User prefers Go language"
+./localmemory list
+./localmemory query Go
+./localmemory stats
+./localmemory forget <memory-id>
+
+# Start HTTP server
+./localmemory-server &
+```
 
 ### CLI Commands
 
