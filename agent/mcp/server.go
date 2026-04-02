@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -46,7 +47,8 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 // Reads requests from stdin, outputs responses to stdout.
 func (s *MCPServer) Run() error {
 	decoder := json.NewDecoder(os.Stdin)
-	encoder := json.NewEncoder(os.Stdout)
+	writer := bufio.NewWriter(os.Stdout)
+	encoder := json.NewEncoder(writer)
 
 	for {
 		var req JSONRPCRequest
@@ -57,8 +59,15 @@ func (s *MCPServer) Run() error {
 			continue
 		}
 
+		// Handle notifications (no response needed)
+		if req.ID == nil {
+			s.handleNotification(&req)
+			continue
+		}
+
 		resp := s.handleRequest(&req)
 		encoder.Encode(resp)
+		writer.Flush()
 	}
 }
 
@@ -82,6 +91,14 @@ type JSONRPCResponse struct {
 type JSONRPCError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+// handleNotification handles JSON-RPC notifications (no response needed).
+func (s *MCPServer) handleNotification(req *JSONRPCRequest) {
+	switch req.Method {
+	case "initialized":
+		// Claude Code sends this after initialize, acknowledgment only
+	}
 }
 
 // handleRequest handles JSON-RPC requests.
@@ -139,8 +156,7 @@ func (s *MCPServer) handleInitialize(params json.RawMessage) (interface{}, error
 	return map[string]any{
 		"protocolVersion": "2024-11-05",
 		"capabilities": map[string]any{
-			"tools":    map[string]any{},
-			"resources": map[string]any{},
+			"tools": map[string]any{},
 		},
 		"serverInfo": map[string]any{
 			"name":    "localmemory",

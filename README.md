@@ -298,23 +298,55 @@ curl -X POST http://localhost:8080/api/v1/query \
 
 ### Option 3: Claude Code Integration
 
-```json
-// ~/.claude/settings.json
-{
-  "mcpServers": {
-    "localmemory": {
-      "command": "localmemory",
-      "args": ["mcp"]
-    }
-  }
-}
+**Step 1: Build the MCP binary**
+
+```bash
+# From the local-memory directory
+go build -o localmemory-mcp.exe ./cmd/mcp/
 ```
 
-Then Claude Code can use memory tools:
-- `memory_save` - Save new memories
-- `memory_query` - Search memories
-- `memory_list` - List recent memories
-- `memory_forget` - Delete memories
+**Step 2: Add MCP server to Claude Code**
+
+```bash
+# Use claude mcp CLI to add the server
+claude mcp add localmemory -- /path/to/localmemory-mcp.exe
+
+# Windows example:
+claude mcp add localmemory -- D:\code\local-memory\localmemory-mcp.exe
+
+# Linux/macOS example:
+claude mcp add localmemory -- /home/user/local-memory/localmemory-mcp
+```
+
+**Step 3: Restart Claude Code**
+
+After adding the MCP server, **completely exit Claude Code** (ensure the process terminates) and restart.
+
+**Step 4: Verify connection**
+
+Run `/mcp` in Claude Code to confirm the localmemory server is connected.
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `memory_save` | Save a new memory (key, value, type, scope, tags, confidence) |
+| `memory_query` | Search memories semantically (query, topk, scope) |
+| `memory_list` | List memories (limit, scope) |
+| `memory_forget` | Delete a memory by ID |
+
+**Example usage in Claude Code:**
+
+```
+User: Remember I prefer Go over Python
+AI: [calls memory_save with type="preference", key="language", value="Go"]
+
+User: What language should I use?
+AI: [calls memory_query to find language preferences]
+
+User: List all my memories
+AI: [calls memory_list to show all memories]
+```
 
 ---
 
