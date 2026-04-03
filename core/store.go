@@ -105,8 +105,14 @@ func (s *Store) Save(m *Memory) error {
 // evolveAndSave evolves and saves.
 // When memory with same key exists, merges the two.
 func (s *Store) evolveAndSave(existing, new *Memory) error {
-	// Update existing memory's value (append new information)
-	existing.Value = existing.Value + "\n" + new.Value
+	// Update existing memory's value (append new information, avoid empty append)
+	if new.Value != "" {
+		if existing.Value != "" {
+			existing.Value = existing.Value + "\n" + new.Value
+		} else {
+			existing.Value = new.Value
+		}
+	}
 
 	// Update confidence: take higher value, but not exceeding 1.0
 	existing.Confidence = minFloat64(1.0, existing.Confidence+0.1)

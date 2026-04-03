@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"localmemory/bridge"
 	"localmemory/config"
 	"localmemory/core"
 	"localmemory/storage"
@@ -12,9 +13,10 @@ import (
 
 // Server represents an HTTP server.
 type Server struct {
-	router *gin.Engine
-	cfg    *config.Config
-	store  *core.Store
+	router   *gin.Engine
+	cfg      *config.Config
+	store    *core.Store
+	pyBridge *bridge.PyBridge
 }
 
 // NewServer creates an HTTP server instance.
@@ -38,9 +40,10 @@ func NewServer(cfg *config.Config) *Server {
 	store := core.NewStore(sqliteStore, nil, nil)
 
 	srv := &Server{
-		router: router,
-		cfg:    cfg,
-		store:  store,
+		router:   router,
+		cfg:      cfg,
+		store:    store,
+		pyBridge: bridge.NewPyBridge("http://" + cfg.Bridge.TCPURL),
 	}
 
 	// Register routes
@@ -65,6 +68,9 @@ func (s *Server) registerRoutes() {
 
 		// Semantic search
 		v1.POST("/query", s.queryHandler)
+
+		// AI extraction
+		v1.POST("/extract", s.extractHandler)
 
 		// Statistics
 		v1.GET("/stats", s.statsHandler)
@@ -92,6 +98,17 @@ type QueryRequest struct {
 	Query string `json:"query"`
 	TopK  int    `json:"topk"`
 	Scope string `json:"scope"`
+}
+
+type ExtractRequest struct {
+	Text string `json:"text"`
+}
+
+type ExtractResponse struct {
+	Type      string  `json:"type"`
+	Key       string  `json:"key"`
+	Value     string  `json:"value"`
+	Confidence float64 `json:"confidence"`
 }
 
 type APIResponse struct {
@@ -334,6 +351,46 @@ func (s *Server) statsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, APIResponse{
 		Success: true,
 		Data:    stats,
+	})
+}
+
+func (s *Server) extractHandler(c *gin.Context) {
+	var req ExtractRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	if req.Text == "" {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Text is required",
+		})
+		return
+	}
+
+	// Call Python AI service to extract memory structure
+	result, err := s.pyBridge.Extract(req.Text)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   "Failed to extract memory: " + err.Error(),
+		})
+		return
+	}
+
+	// Return extracted memory structure
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data: ExtractResponse{
+			Type:       result.Type,
+			Key:        result.Key,
+			Value:      result.Value,
+			Confidence: result.Confidence,
+		},
 	})
 }
 

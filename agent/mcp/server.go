@@ -7,21 +7,27 @@ import (
 	"os"
 	"sync"
 
+	"localmemory/bridge"
 	"localmemory/config"
 	"localmemory/core"
 	"localmemory/storage"
+	"localmemory/storage/vector"
 )
 
 // MCPServer implements the MCP Server.
 // Uses stdio transport protocol to communicate with Claude Code.
 type MCPServer struct {
-	cfg         *config.Config
-	sqliteStore *storage.SQLiteStore
-	store      *core.Store
-	ranker     *core.Ranker
-	forget     *core.Forget
-	link       *core.Link
-	mu         sync.Mutex
+	cfg           *config.Config
+	sqliteStore   *storage.SQLiteStore
+	store         *core.Store
+	recall        *core.Recall
+	ranker        *core.Ranker
+	forget        *core.Forget
+	link          *core.Link
+	vectorStore   core.VectorStore
+	embeddingSvc  core.EmbeddingService
+	useSemanticSearch bool
+	mu            sync.Mutex
 }
 
 // NewMCPServer creates an MCP Server instance.
@@ -34,14 +40,97 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	server := &MCPServer{
 		cfg:         cfg,
 		sqliteStore: sqliteStore,
-		store:      core.NewStore(sqliteStore, nil, nil),
-		ranker:     core.NewRanker(cfg.Decay.Lambda),
-		forget:     core.NewForget(sqliteStore, nil),
-		link:       core.NewLink(sqliteStore),
+		store:       core.NewStore(sqliteStore, nil, nil),
+		ranker:      core.NewRanker(cfg.Decay.Lambda),
+		forget:      core.NewForget(sqliteStore, nil),
+		link:        core.NewLink(sqliteStore),
 	}
+
+	// Try to initialize vector store and embedding service for semantic search
+	server.initAIComponents()
 
 	return server, nil
 }
+
+// initAIComponents initializes vector store and embedding service.
+func (s *MCPServer) initAIComponents() {
+	// Initialize vector store
+	vectorCfg := vector.USearchConfig{
+		Path:       "./data/usearch",
+		VectorSize: 384, // Standard embedding dimension for all-MiniLM-L6-v2
+		Metric:     "cosine",
+	}
+	vs, err := vector.NewVectorStore("usearch", vectorCfg)
+	if err == nil {
+		// Create adapter to convert vector.VectorStore to core.VectorStore
+		s.vectorStore = &vectorStoreAdapter{store: vs}
+		s.useSemanticSearch = true
+	}
+
+	// Initialize embedding service (Python AI bridge)
+	if s.cfg.Bridge.TCPURL != "" {
+		pb := bridge.NewPyBridge("http://" + s.cfg.Bridge.TCPURL)
+		// Test if Python AI service is available
+		if err := pb.HealthCheck(); err == nil {
+			s.embeddingSvc = pb
+		}
+	}
+
+	// Create store and recall with real components if available
+	if s.vectorStore != nil && s.embeddingSvc != nil {
+		s.store = core.NewStore(s.sqliteStore, s.vectorStore, s.embeddingSvc)
+		s.recall = core.NewRecall(s.sqliteStore, s.vectorStore, s.embeddingSvc, s.ranker)
+	}
+}
+
+// vectorStoreAdapter wraps storage/vector.VectorStore to implement core.VectorStore.
+type vectorStoreAdapter struct {
+	store interface {
+		Upsert(id string, vector []float32, metadata map[string]any) error
+		Search(query []float32, topK int, filter *vector.Filter) ([]vector.Result, error)
+		Delete(id string) error
+		Close() error
+	}
+}
+
+func (a *vectorStoreAdapter) Upsert(id string, vector []float32, metadata map[string]any) error {
+	return a.store.Upsert(id, vector, metadata)
+}
+
+func (a *vectorStoreAdapter) Search(query []float32, topK int, filter *core.VectorFilter) ([]core.VectorResult, error) {
+	vf := &vector.Filter{}
+	if filter != nil {
+		vf = &vector.Filter{
+			Scope: filter.Scope,
+			Type:  filter.Type,
+			Tags:  filter.Tags,
+		}
+	}
+	results, err := a.store.Search(query, topK, vf)
+	if err != nil {
+		return nil, err
+	}
+	var coreResults []core.VectorResult
+	for _, r := range results {
+		coreResults = append(coreResults, core.VectorResult{
+			ID:       r.ID,
+			Score:    r.Score,
+			Metadata: r.Metadata,
+		})
+	}
+	return coreResults, nil
+}
+
+func (a *vectorStoreAdapter) Delete(id string) error {
+	return a.store.Delete(id)
+}
+
+func (a *vectorStoreAdapter) Close() error {
+	return a.store.Close()
+}
+
+// Ensure adapter implements core.VectorStore
+var _ core.VectorStore = (*vectorStoreAdapter)(nil)
 
 // Run starts the MCP Server.
 // Reads requests from stdin, outputs responses to stdout.
@@ -303,27 +392,43 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 		params.TopK = 5
 	}
 
-	recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
-	listReq := &core.ListRequest{
-		Scope: core.Scope(params.Scope),
-		Limit: 100,
-	}
-
-	resp, err := recall.List(listReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Simple keyword matching
 	var results []*core.QueryResult
-	for _, m := range resp.Memories {
-		if containsString(m.Value, params.Query) || containsString(m.Key, params.Query) {
-			results = append(results, &core.QueryResult{
-				Memory: m,
-				Score:  0.8,
-			})
-			if len(results) >= params.TopK {
-				break
+
+	// Try semantic search if AI components are available
+	if s.useSemanticSearch && s.recall != nil {
+		queryReq := &core.QueryRequest{
+			Query: params.Query,
+			TopK:  params.TopK,
+			Scope: core.Scope(params.Scope),
+		}
+		queryResp, err := s.recall.Query(queryReq)
+		if err == nil && len(queryResp.Results) > 0 {
+			results = queryResp.Results
+		}
+	}
+
+	// Fallback to keyword matching if semantic search didn't return results
+	if len(results) == 0 {
+		recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
+		listReq := &core.ListRequest{
+			Scope: core.Scope(params.Scope),
+			Limit: 100,
+		}
+
+		resp, err := recall.List(listReq)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, m := range resp.Memories {
+			if containsString(m.Value, params.Query) || containsString(m.Key, params.Query) {
+				results = append(results, &core.QueryResult{
+					Memory: m,
+					Score:  0.8,
+				})
+				if len(results) >= params.TopK {
+					break
+				}
 			}
 		}
 	}
@@ -335,7 +440,7 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 	} else {
 		text = "Found related memories:\n"
 		for i, r := range results {
-			text += fmt.Sprintf("%d. [%s] %s: %s\n", i+1, r.Memory.Type, r.Memory.Key, truncate(r.Memory.Value, 100))
+			text += fmt.Sprintf("%d. [%s] %s: %s (score: %.2f)\n", i+1, r.Memory.Type, r.Memory.Key, truncate(r.Memory.Value, 100), r.Score)
 		}
 	}
 
@@ -360,17 +465,35 @@ func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 		params.Limit = 20
 	}
 
-	recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
-	resp, err := recall.List(&core.ListRequest{
-		Scope: core.Scope(params.Scope),
-		Limit: params.Limit,
-	})
-	if err != nil {
-		return nil, err
+	var memories []*core.Memory
+	var total int
+
+	// Use recall if available, otherwise create one with nil components
+	if s.recall != nil {
+		resp, err := s.recall.List(&core.ListRequest{
+			Scope: core.Scope(params.Scope),
+			Limit: params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		memories = resp.Memories
+		total = resp.Total
+	} else {
+		recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
+		resp, err := recall.List(&core.ListRequest{
+			Scope: core.Scope(params.Scope),
+			Limit: params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		memories = resp.Memories
+		total = resp.Total
 	}
 
-	text := fmt.Sprintf("Memory list (%d total):\n", resp.Total)
-	for i, m := range resp.Memories {
+	text := fmt.Sprintf("Memory list (%d total):\n", total)
+	for i, m := range memories {
 		text += fmt.Sprintf("%d. [%s] %s: %s\n", i+1, m.Type, m.Key, truncate(m.Value, 80))
 	}
 
