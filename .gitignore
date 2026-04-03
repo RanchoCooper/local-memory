@@ -1,3 +1,5 @@
 .idea
 data
 build
+web/dist
+web/node_modules

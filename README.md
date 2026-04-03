@@ -166,7 +166,12 @@ local-memory/
 ├── config.json               # Configuration file
 ├── Makefile                  # Build automation
 ├── Dockerfile               # Container image
-└── docker-compose.yaml      # Full stack deployment
+├── docker-compose.yaml      # Full stack deployment
+└── web/                      # Web UI (React + Three.js)
+    ├── src/                  # Source code
+    ├── README.md             # Web UI documentation
+    └── package.json          # Dependencies
+
 ```
 
 ### Data Flow
@@ -251,6 +256,7 @@ Query Input
 - **Go** 1.21+
 - **Python** 3.10+ (for AI features)
 - **Docker** & **Docker Compose** (for full deployment)
+- **Node.js** 18+ (for web UI)
 
 ### Option 1: CLI Only (MVP)
 
@@ -350,6 +356,27 @@ AI: [calls memory_query to find language preferences]
 User: List all my memories
 AI: [calls memory_list to show all memories]
 ```
+
+### Option 4: Web UI
+
+A modern web interface with 3D neural graph visualization:
+
+```bash
+# Start the backend server (required for API)
+.\localmemory-server.exe
+
+# In another terminal, start the web UI
+cd web
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173 in your browser.
+
+**Web UI Features:**
+- Dashboard with memory statistics
+- Memory list with type filtering
+- 3D Neural Graph visualization (drag to rotate, scroll to zoom, hover for details)
 
 ---
 
