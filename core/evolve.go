@@ -28,6 +28,7 @@ var DefaultMergeOption = &MergeOption{
 }
 
 // Merge merges two memories with the same key.
+// Returns a new Memory with merged values, does not modify inputs.
 // 1. Merge value (append new information)
 // 2. Update confidence (take higher value + increment)
 // 3. Update timestamp
@@ -39,26 +40,34 @@ func (e *Evolve) Merge(existing, new *Memory, opts *MergeOption) (*Memory, error
 
 	// Merge value
 	mergedValue := e.mergeValue(existing.Value, new.Value, opts.Strategy)
-	existing.Value = mergedValue
 
-	// Update confidence: take higher value + 0.1 increment
-	existing.Confidence = minFloat64(1.0, existing.Confidence+0.1)
-
-	// Update timestamp
-	existing.UpdatedAt = time.Now().Unix()
-
-	// Merge tags
-	existing.Tags = mergeTags(existing.Tags, new.Tags)
-
-	// Merge related memories (deduplicate)
-	existing.RelatedIDs = mergeIDs(existing.RelatedIDs, new.RelatedIDs)
+	// Create new merged memory (immutable pattern)
+	merged := &Memory{
+		ID:            existing.ID,
+		ProfileID:     existing.ProfileID,
+		Type:          existing.Type,
+		Scope:         existing.Scope,
+		MediaType:     existing.MediaType,
+		Key:           existing.Key,
+		Value:         mergedValue,
+		Confidence:    minFloat64(1.0, existing.Confidence+0.1),
+		EvidenceCount: existing.EvidenceCount,
+		Tags:          mergeTags(existing.Tags, new.Tags),
+		RelatedIDs:    mergeIDs(existing.RelatedIDs, new.RelatedIDs),
+		Metadata:      existing.Metadata,
+		Embedding:     existing.Embedding,
+		Deleted:       existing.Deleted,
+		DeletedAt:     existing.DeletedAt,
+		CreatedAt:     existing.CreatedAt,
+		UpdatedAt:     time.Now().Unix(),
+	}
 
 	// Keep better metadata
 	if new.Metadata.Source != "" {
-		existing.Metadata.Source = new.Metadata.Source
+		merged.Metadata.Source = new.Metadata.Source
 	}
 
-	return existing, nil
+	return merged, nil
 }
 
 // mergeValue merges memory values.

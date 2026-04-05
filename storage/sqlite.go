@@ -155,9 +155,18 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 	m.BeforeSave()
 
 	// Serialize complex fields to JSON
-	relatedIDs, _ := m.MarshalRelatedIDs()
-	tags, _ := m.MarshalTags()
-	metadata, _ := m.MarshalMetadata()
+	relatedIDs, err := m.MarshalRelatedIDs()
+	if err != nil {
+		return fmt.Errorf("failed to marshal related IDs: %w", err)
+	}
+	tags, err := m.MarshalTags()
+	if err != nil {
+		return fmt.Errorf("failed to marshal tags: %w", err)
+	}
+	metadata, err := m.MarshalMetadata()
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
 
 	query := `
 	INSERT INTO memories (id, profile_id, type, scope, media_type, key, value, confidence, evidence_count, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at)
@@ -179,7 +188,7 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 		updated_at = excluded.updated_at
 	`
 
-	_, err := s.db.Exec(query,
+	_, err = s.db.Exec(query,
 		m.ID, m.ProfileID, m.Type, m.Scope, m.MediaType, m.Key, m.Value,
 		m.Confidence, m.EvidenceCount, relatedIDs, tags, metadata,
 		m.Deleted, m.DeletedAt, m.CreatedAt, m.UpdatedAt,

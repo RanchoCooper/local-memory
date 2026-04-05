@@ -121,9 +121,9 @@ func TestIntegration_EvolveMemory(t *testing.T) {
 		t.Errorf("Expected merged value, got '%s'", got.Value)
 	}
 
-	// Confidence should be higher
-	if got.Confidence <= 1.0 {
-		t.Errorf("Expected confidence > 1.0 after evolve, got %f", got.Confidence)
+	// Confidence should be higher (capped at 1.0)
+	if got.Confidence < 1.0 {
+		t.Errorf("Expected confidence >= 1.0 after evolve, got %f", got.Confidence)
 	}
 }
 

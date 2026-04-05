@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 
 	"localmemory/bridge"
 	"localmemory/config"
@@ -16,6 +17,8 @@ type Server struct {
 	router   *gin.Engine
 	cfg      *config.Config
 	store    *core.Store
+	recall   *core.Recall
+	sqliteStore *storage.SQLiteStore
 	pyBridge *bridge.PyBridge
 }
 
@@ -38,12 +41,15 @@ func NewServer(cfg *config.Config) *Server {
 	}
 
 	store := core.NewStore(sqliteStore, nil, nil)
+	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(cfg.Decay.Lambda))
 
 	srv := &Server{
-		router:   router,
-		cfg:      cfg,
-		store:    store,
-		pyBridge: bridge.NewPyBridge("http://" + cfg.Bridge.TCPURL),
+		router:      router,
+		cfg:         cfg,
+		store:       store,
+		recall:      recall,
+		sqliteStore: sqliteStore,
+		pyBridge:    bridge.NewPyBridge("http://" + cfg.Bridge.TCPURL),
 	}
 
 	// Register routes
@@ -141,6 +147,63 @@ func (s *Server) createMemoryHandler(c *gin.Context) {
 		return
 	}
 
+	// Validate memory type
+	validTypes := map[core.MemoryType]bool{
+		core.TypePreference: true, core.TypeFact: true,
+		core.TypeEvent: true, core.TypeSkill: true,
+		core.TypeGoal: true, core.TypeRelationship: true,
+	}
+	if req.Type != "" && !validTypes[core.MemoryType(req.Type)] {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Invalid type: must be preference, fact, event, skill, goal, or relationship",
+		})
+		return
+	}
+
+	// Validate scope
+	validScopes := map[core.Scope]bool{
+		core.ScopeGlobal: true, core.ScopeSession: true, core.ScopeAgent: true,
+	}
+	if req.Scope != "" && !validScopes[core.Scope(req.Scope)] {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Invalid scope: must be global, session, or agent",
+		})
+		return
+	}
+
+	// Validate media type
+	validMedia := map[core.MediaType]bool{
+		core.MediaText: true, core.MediaImage: true,
+		core.MediaAudio: true, core.MediaVideo: true,
+	}
+	if req.MediaType != "" && !validMedia[core.MediaType(req.MediaType)] {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Invalid media_type: must be text, image, audio, or video",
+		})
+		return
+	}
+
+	// Validate confidence range
+	if req.Confidence < 0 || req.Confidence > 1 {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Confidence must be between 0 and 1",
+		})
+		return
+	}
+
+	// Validate key length
+	if len(req.Key) > 500 {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Key too long: maximum 500 characters",
+		})
+		return
+	}
+
 	profileID := req.ProfileID
 	if profileID == "" {
 		profileID = s.cfg.Profile.ID
@@ -166,7 +229,7 @@ func (s *Server) createMemoryHandler(c *gin.Context) {
 	if err := s.store.Save(memory); err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
-			Error:   "Failed to save memory: " + err.Error(),
+			Error:   "Failed to save memory",
 		})
 		return
 	}
@@ -188,18 +251,7 @@ func (s *Server) listMemoriesHandler(c *gin.Context) {
 		Offset: offset,
 	}
 
-	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Error:   "Failed to init storage",
-		})
-		return
-	}
-	defer sqliteStore.Close()
-
-	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(s.cfg.Decay.Lambda))
-	resp, err := recall.List(listReq)
+	resp, err := s.recall.List(listReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
@@ -217,18 +269,7 @@ func (s *Server) listMemoriesHandler(c *gin.Context) {
 func (s *Server) getMemoryHandler(c *gin.Context) {
 	id := c.Param("id")
 
-	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Error:   "Failed to init storage",
-		})
-		return
-	}
-	defer sqliteStore.Close()
-
-	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(s.cfg.Decay.Lambda))
-	memory, err := recall.GetByID(id)
+	memory, err := s.recall.GetByID(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
@@ -254,17 +295,7 @@ func (s *Server) getMemoryHandler(c *gin.Context) {
 func (s *Server) deleteMemoryHandler(c *gin.Context) {
 	id := c.Param("id")
 
-	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Error:   "Failed to init storage",
-		})
-		return
-	}
-	defer sqliteStore.Close()
-
-	forget := core.NewForget(sqliteStore, nil)
+	forget := core.NewForget(s.sqliteStore, nil)
 	if err := forget.Delete(id); err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
@@ -293,18 +324,6 @@ func (s *Server) queryHandler(c *gin.Context) {
 		req.TopK = 5
 	}
 
-	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Error:   "Failed to init storage",
-		})
-		return
-	}
-	defer sqliteStore.Close()
-
-	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(s.cfg.Decay.Lambda))
-
 	profileID := req.ProfileID
 	if profileID == "" {
 		profileID = s.cfg.Profile.ID
@@ -319,7 +338,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 		Limit:     100,
 		ProfileID: profileID,
 	}
-	resp, err := recall.List(listReq)
+	resp, err := s.recall.List(listReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
@@ -331,7 +350,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 	// Simple matching
 	var results []*core.QueryResult
 	for _, m := range resp.Memories {
-		if containsString(m.Value, req.Query) || containsString(m.Key, req.Query) {
+		if strings.Contains(m.Value, req.Query) || strings.Contains(m.Key, req.Query) {
 			results = append(results, &core.QueryResult{
 				Memory: m,
 				Score:  0.8,
@@ -349,17 +368,7 @@ func (s *Server) queryHandler(c *gin.Context) {
 }
 
 func (s *Server) statsHandler(c *gin.Context) {
-	sqliteStore, err := storage.NewSQLiteStore(s.cfg.Database.Path)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Error:   "Failed to init storage",
-		})
-		return
-	}
-	defer sqliteStore.Close()
-
-	stats, err := sqliteStore.GetStats()
+	stats, err := s.sqliteStore.GetStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Success: false,
@@ -412,17 +421,4 @@ func (s *Server) extractHandler(c *gin.Context) {
 			Confidence: result.Confidence,
 		},
 	})
-}
-
-// containsString checks if string contains substring.
-func containsString(s, substr string) bool {
-	if len(substr) > len(s) {
-		return false
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

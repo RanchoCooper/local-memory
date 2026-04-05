@@ -46,11 +46,11 @@ func (c *Consolidator) ComputeSimilarity(text1, text2 string) (float64, error) {
 		return 0, err
 	}
 
-	return cosineSimilarity(vec1, vec2), nil
+	return CosineSimilarity(vec1, vec2), nil
 }
 
-// cosineSimilarity computes cosine similarity between two vectors.
-func cosineSimilarity(a, b []float32) float64 {
+// CosineSimilarity computes cosine similarity between two vectors.
+func CosineSimilarity(a, b []float32) float64 {
 	if len(a) != len(b) || len(a) == 0 {
 		return 0
 	}
