@@ -86,6 +86,11 @@ func (s *USearchStore) Search(query []float32, topK int, filter *Filter) ([]Resu
 					continue
 				}
 			}
+			if filter.ProfileID != "" {
+				if pid, ok := meta["profile_id"].(string); !ok || pid != filter.ProfileID {
+					continue
+				}
+			}
 		}
 
 		score := cosineSimilarity(query, vec)

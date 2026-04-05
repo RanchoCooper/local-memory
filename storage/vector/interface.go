@@ -2,9 +2,10 @@ package vector
 
 // Filter represents filter conditions for vector search.
 type Filter struct {
-	Scope string
-	Type  string
-	Tags  []string
+	Scope     string
+	Type      string
+	Tags      []string
+	ProfileID string
 }
 
 // Result represents a vector search result.

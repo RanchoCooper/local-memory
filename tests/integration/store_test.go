@@ -108,7 +108,7 @@ func TestIntegration_EvolveMemory(t *testing.T) {
 	}
 
 	// Get the memory - should have merged values
-	got, err := store.GetByKey("evolve_test_key")
+	got, err := store.GetByKey("evolve_test_key", "default")
 	if err != nil {
 		t.Fatalf("Failed to get memory: %v", err)
 	}

@@ -90,7 +90,12 @@ func (e *Evolve) mergeValue(existing, new, strategy string) string {
 // EvolveExisting checks and evolves an existing memory.
 // If a memory with the same key exists, merge them.
 func (e *Evolve) EvolveExisting(memory *Memory) (*Memory, bool, error) {
-	existing, err := e.store.sqliteStore.GetByKey(memory.Key)
+	// Ensure profile_id is set before lookup
+	if memory.ProfileID == "" {
+		memory.ProfileID = "default"
+	}
+
+	existing, err := e.store.sqliteStore.GetByKey(memory.Key, memory.ProfileID)
 	if err != nil {
 		return nil, false, err
 	}

@@ -8,21 +8,23 @@ import (
 // Memory is the fundamental memory unit for AI agents.
 // It contains type, scope, content, associations, and other metadata.
 type Memory struct {
-	ID         string     `json:"id"`                      // Unique identifier, UUID format
-	Type       MemoryType `json:"type"`                    // Memory type: preference | fact | event
-	Scope      Scope      `json:"scope"`                   // Scope: global | session | agent
-	MediaType  MediaType  `json:"media_type"`             // Media type: text | image | audio | video
-	Key        string     `json:"key"`                     // Memory key for unique identification and retrieval
-	Value      string     `json:"value"`                  // Memory value, text content or media path
-	Confidence float64    `json:"confidence"`              // Confidence score, 0.0~1.0
-	RelatedIDs []string   `json:"related_ids"`            // Related memory ID list, supports graph associations
-	Tags       []string   `json:"tags"`                   // Tag list for categorization and retrieval
-	Metadata   Metadata   `json:"metadata"`                // Extended metadata: source, language, file info, etc.
-	Deleted    bool       `json:"deleted"`                // Soft delete flag, true means deleted
-	DeletedAt  int64      `json:"deleted_at"`             // Delete timestamp, Unix time
-	Embedding  []float32 `json:"-"`                      // Vector embedding, in-memory only, not persisted to database
-	CreatedAt  int64     `json:"created_at"`             // Creation timestamp, Unix time
-	UpdatedAt  int64     `json:"updated_at"`             // Update timestamp, Unix time
+	ID            string     `json:"id"`                      // Unique identifier, UUID format
+	ProfileID     string     `json:"profile_id"`            // Profile identifier for isolation
+	Type          MemoryType `json:"type"`                    // Memory type: preference | fact | event
+	Scope         Scope      `json:"scope"`                   // Scope: global | session | agent
+	MediaType     MediaType  `json:"media_type"`             // Media type: text | image | audio | video
+	Key           string     `json:"key"`                     // Memory key for unique identification and retrieval
+	Value         string     `json:"value"`                  // Memory value, text content or media path
+	Confidence    float64    `json:"confidence"`              // Confidence score, 0.0~1.0
+	EvidenceCount int        `json:"evidence_count"`         // Number of supporting evidences
+	RelatedIDs    []string   `json:"related_ids"`            // Related memory ID list, supports graph associations
+	Tags          []string   `json:"tags"`                   // Tag list for categorization and retrieval
+	Metadata      Metadata   `json:"metadata"`                // Extended metadata: source, language, file info, etc.
+	Deleted       bool       `json:"deleted"`                // Soft delete flag, true means deleted
+	DeletedAt     int64      `json:"deleted_at"`             // Delete timestamp, Unix time
+	Embedding     []float32 `json:"-"`                      // Vector embedding, in-memory only, not persisted to database
+	CreatedAt     int64     `json:"created_at"`             // Creation timestamp, Unix time
+	UpdatedAt     int64     `json:"updated_at"`             // Update timestamp, Unix time
 }
 
 // MemoryType represents the type of memory.
@@ -73,10 +75,11 @@ type Metadata struct {
 
 // QueryRequest represents a semantic search request.
 type QueryRequest struct {
-	Query string   `json:"query"`                      // Query text, natural language description
-	TopK  int      `json:"topk"`                       // Maximum number of results to return
-	Scope Scope    `json:"scope,omitempty"`            // Optional: scope filter
-	Tags  []string `json:"tags,omitempty"`             // Optional: tag filter
+	Query     string   `json:"query"`                      // Query text, natural language description
+	TopK      int      `json:"topk"`                       // Maximum number of results to return
+	Scope     Scope    `json:"scope,omitempty"`            // Optional: scope filter
+	Tags      []string `json:"tags,omitempty"`             // Optional: tag filter
+	ProfileID string   `json:"profile_id,omitempty"`       // Optional: profile filter
 }
 
 // QueryResult represents a single search result.
@@ -97,6 +100,7 @@ type ListRequest struct {
 	Limit          int      `json:"limit"`                      // Page size
 	Offset         int      `json:"offset"`                     // Offset
 	IncludeDeleted bool     `json:"include_deleted"`            // Whether to include deleted memories
+	ProfileID      string   `json:"profile_id,omitempty"`       // Optional: profile filter
 }
 
 // ListResponse represents a list query response.
@@ -132,6 +136,12 @@ func (m *Memory) BeforeSave() {
 	}
 	if m.MediaType == "" {
 		m.MediaType = MediaText // Default media type is text
+	}
+	if m.ProfileID == "" {
+		m.ProfileID = "default" // Default profile is "default"
+	}
+	if m.EvidenceCount == 0 {
+		m.EvidenceCount = 1 // Default evidence count is 1
 	}
 }
 

@@ -52,23 +52,26 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 func (s *SQLiteStore) initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS memories (
-		id          TEXT PRIMARY KEY,
-		type        TEXT NOT NULL,
-		scope       TEXT NOT NULL,
-		media_type  TEXT DEFAULT 'text',
-		key         TEXT NOT NULL,
-		value       TEXT NOT NULL,
-		confidence  REAL DEFAULT 1.0,
-		related_ids TEXT,
-		tags        TEXT,
-		metadata    TEXT,
-		deleted     INTEGER DEFAULT 0,
-		deleted_at  INTEGER,
-		created_at  INTEGER NOT NULL,
-		updated_at  INTEGER NOT NULL
+		id             TEXT PRIMARY KEY,
+		profile_id     TEXT NOT NULL DEFAULT 'default',
+		type           TEXT NOT NULL,
+		scope          TEXT NOT NULL,
+		media_type     TEXT DEFAULT 'text',
+		key            TEXT NOT NULL,
+		value          TEXT NOT NULL,
+		confidence     REAL DEFAULT 1.0,
+		evidence_count INTEGER DEFAULT 1,
+		related_ids    TEXT,
+		tags           TEXT,
+		metadata       TEXT,
+		deleted        INTEGER DEFAULT 0,
+		deleted_at     INTEGER,
+		created_at     INTEGER NOT NULL,
+		updated_at     INTEGER NOT NULL
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_memories_key ON memories(key);
+	CREATE INDEX IF NOT EXISTS idx_memories_profile ON memories(profile_id);
 	CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope);
 	CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
 	CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at);
@@ -77,7 +80,72 @@ func (s *SQLiteStore) initSchema() error {
 	`
 
 	_, err := s.db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Run migrations for backward compatibility
+	return s.migrate()
+}
+
+// migrate runs schema migrations for backward compatibility.
+func (s *SQLiteStore) migrate() error {
+	// Migration: add profile_id column if it doesn't exist (from pre-profile era)
+	exists, err := s.columnExists("profile_id")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err = s.db.Exec("ALTER TABLE memories ADD COLUMN profile_id TEXT NOT NULL DEFAULT 'default'")
+		if err != nil {
+			return err
+		}
+		_, err = s.db.Exec("CREATE INDEX IF NOT EXISTS idx_memories_profile ON memories(profile_id)")
+		if err != nil {
+			return err
+		}
+	}
+
+	// Migration: add evidence_count column if it doesn't exist
+	exists, err = s.columnExists("evidence_count")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err = s.db.Exec("ALTER TABLE memories ADD COLUMN evidence_count INTEGER DEFAULT 1")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// columnExists checks if a column exists in the memories table.
+func (s *SQLiteStore) columnExists(columnName string) (bool, error) {
+	// Use PRAGMA table_info for reliable column existence check.
+	// This works correctly regardless of whether the table is empty.
+	pragmaQuery := `PRAGMA table_info(memories)`
+	rows, err := s.db.Query(pragmaQuery)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var cname string
+		var ctype string
+		var notnull int
+		var dflt_value interface{}
+		var pk int
+		if err := rows.Scan(&cid, &cname, &ctype, &notnull, &dflt_value, &pk); err != nil {
+			return false, err
+		}
+		if cname == columnName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Save saves or updates a memory.
@@ -92,15 +160,17 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 	metadata, _ := m.MarshalMetadata()
 
 	query := `
-	INSERT INTO memories (id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO memories (id, profile_id, type, scope, media_type, key, value, confidence, evidence_count, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
+		profile_id = excluded.profile_id,
 		type = excluded.type,
 		scope = excluded.scope,
 		media_type = excluded.media_type,
 		key = excluded.key,
 		value = excluded.value,
 		confidence = excluded.confidence,
+		evidence_count = excluded.evidence_count,
 		related_ids = excluded.related_ids,
 		tags = excluded.tags,
 		metadata = excluded.metadata,
@@ -110,8 +180,8 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 	`
 
 	_, err := s.db.Exec(query,
-		m.ID, m.Type, m.Scope, m.MediaType, m.Key, m.Value,
-		m.Confidence, relatedIDs, tags, metadata,
+		m.ID, m.ProfileID, m.Type, m.Scope, m.MediaType, m.Key, m.Value,
+		m.Confidence, m.EvidenceCount, relatedIDs, tags, metadata,
 		m.Deleted, m.DeletedAt, m.CreatedAt, m.UpdatedAt,
 	)
 
@@ -122,7 +192,7 @@ func (s *SQLiteStore) Save(m *core.Memory) error {
 // Includes deleted memories (used for recovery scenarios).
 func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 	query := `
-	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
+	SELECT id, profile_id, type, scope, media_type, key, value, confidence, evidence_count, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
 	FROM memories
 	WHERE id = ?
 	`
@@ -131,8 +201,8 @@ func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 	var relatedIDs, tags, metadata sql.NullString
 
 	err := s.db.QueryRow(query, id).Scan(
-		&m.ID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
-		&m.Confidence, &relatedIDs, &tags, &metadata,
+		&m.ID, &m.ProfileID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
+		&m.Confidence, &m.EvidenceCount, &relatedIDs, &tags, &metadata,
 		&m.Deleted, &m.DeletedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 
@@ -158,7 +228,7 @@ func (s *SQLiteStore) GetByID(id string) (*core.Memory, error) {
 }
 
 // List lists memories with pagination.
-// Supports filtering by scope and tags, optionally includes deleted memories.
+// Supports filtering by scope, tags, and profile, optionally includes deleted memories.
 // Returns memory list and total count matching conditions.
 func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 	whereClause := "WHERE 1=1"
@@ -167,6 +237,11 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 	// Exclude deleted memories by default
 	if !req.IncludeDeleted {
 		whereClause += " AND deleted = 0"
+	}
+	// Filter by profile
+	if req.ProfileID != "" {
+		whereClause += " AND profile_id = ?"
+		args = append(args, req.ProfileID)
 	}
 	// Filter by scope
 	if req.Scope != "" {
@@ -190,7 +265,7 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 
 	// Query list, ordered by update time descending
 	query := `
-	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
+	SELECT id, profile_id, type, scope, media_type, key, value, confidence, evidence_count, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
 	FROM memories
 	` + whereClause + `
 	ORDER BY updated_at DESC
@@ -210,8 +285,8 @@ func (s *SQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, error) {
 		var relatedIDs, tags, metadata sql.NullString
 
 		if err := rows.Scan(
-			&m.ID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
-			&m.Confidence, &relatedIDs, &tags, &metadata,
+			&m.ID, &m.ProfileID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
+			&m.Confidence, &m.EvidenceCount, &relatedIDs, &tags, &metadata,
 			&m.Deleted, &m.DeletedAt, &m.CreatedAt, &m.UpdatedAt,
 		); err != nil {
 			return nil, 0, err
@@ -251,13 +326,13 @@ func (s *SQLiteStore) HardDelete(id string) error {
 	return err
 }
 
-// GetByKey retrieves the latest non-deleted memory by key.
+// GetByKey retrieves the latest non-deleted memory by key within a profile.
 // Used for Evolve mechanism: finds memory with same key for merging.
-func (s *SQLiteStore) GetByKey(key string) (*core.Memory, error) {
+func (s *SQLiteStore) GetByKey(key, profileID string) (*core.Memory, error) {
 	query := `
-	SELECT id, type, scope, media_type, key, value, confidence, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
+	SELECT id, profile_id, type, scope, media_type, key, value, confidence, evidence_count, related_ids, tags, metadata, deleted, deleted_at, created_at, updated_at
 	FROM memories
-	WHERE key = ? AND deleted = 0
+	WHERE key = ? AND profile_id = ? AND deleted = 0
 	ORDER BY updated_at DESC
 	LIMIT 1
 	`
@@ -265,9 +340,9 @@ func (s *SQLiteStore) GetByKey(key string) (*core.Memory, error) {
 	var m core.Memory
 	var relatedIDs, tags, metadata sql.NullString
 
-	err := s.db.QueryRow(query, key).Scan(
-		&m.ID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
-		&m.Confidence, &relatedIDs, &tags, &metadata,
+	err := s.db.QueryRow(query, key, profileID).Scan(
+		&m.ID, &m.ProfileID, &m.Type, &m.Scope, &m.MediaType, &m.Key, &m.Value,
+		&m.Confidence, &m.EvidenceCount, &relatedIDs, &tags, &metadata,
 		&m.Deleted, &m.DeletedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 

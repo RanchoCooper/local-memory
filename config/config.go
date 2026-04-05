@@ -17,6 +17,7 @@ type Config struct {
 	Server    ServerConfig   `json:"server"`    // HTTP server configuration
 	CLI       CLIConfig      `json:"cli"`       // CLI default parameters configuration
 	Agent     AgentConfig    `json:"agent"`     // Agent identifier configuration
+	Profile   ProfileConfig  `json:"profile"`   // Profile configuration
 }
 
 // DatabaseConfig holds SQLite database configuration.
@@ -65,6 +66,11 @@ type CLIConfig struct {
 type AgentConfig struct {
 	ID   string `json:"id"`   // Agent unique identifier
 	Name string `json:"name"` // Agent display name
+}
+
+// ProfileConfig holds profile configuration.
+type ProfileConfig struct {
+	ID string `json:"id"` // Default profile ID
 }
 
 var cfg *Config
@@ -131,6 +137,9 @@ func Default() *Config {
 		Agent: AgentConfig{
 			ID:   "localmemory",
 			Name: "LocalMemory",
+		},
+		Profile: ProfileConfig{
+			ID: "default",
 		},
 	}
 }

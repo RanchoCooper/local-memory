@@ -101,9 +101,10 @@ func (a *vectorStoreAdapter) Search(query []float32, topK int, filter *core.Vect
 	vf := &vector.Filter{}
 	if filter != nil {
 		vf = &vector.Filter{
-			Scope: filter.Scope,
-			Type:  filter.Type,
-			Tags:  filter.Tags,
+			Scope:     filter.Scope,
+			Type:      filter.Type,
+			Tags:      filter.Tags,
+			ProfileID: filter.ProfileID,
 		}
 	}
 	results, err := a.store.Search(query, topK, vf)
@@ -266,6 +267,7 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 					"properties": map[string]any{
 						"type":       map[string]any{"type": "string", "enum": []string{"preference", "fact", "event", "skill", "goal"}},
 						"scope":      map[string]any{"type": "string", "enum": []string{"global", "session", "agent"}},
+						"profile_id": map[string]any{"type": "string"},
 						"key":        map[string]any{"type": "string"},
 						"value":      map[string]any{"type": "string"},
 						"confidence": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
@@ -280,9 +282,10 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"query": map[string]any{"type": "string"},
-						"topk":  map[string]any{"type": "integer", "default": 5},
-						"scope":  map[string]any{"type": "string"},
+						"query":      map[string]any{"type": "string"},
+						"topk":       map[string]any{"type": "integer", "default": 5},
+						"scope":      map[string]any{"type": "string"},
+						"profile_id": map[string]any{"type": "string"},
 					},
 					"required": []string{"query"},
 				},
@@ -293,8 +296,9 @@ func (s *MCPServer) handleToolsList(params json.RawMessage) (interface{}, error)
 				"inputSchema": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"scope": map[string]any{"type": "string"},
-						"limit": map[string]any{"type": "integer", "default": 20},
+						"scope":      map[string]any{"type": "string"},
+						"limit":      map[string]any{"type": "integer", "default": 20},
+						"profile_id": map[string]any{"type": "string"},
 					},
 				},
 			},
@@ -340,23 +344,33 @@ func (s *MCPServer) handleToolsCall(params json.RawMessage) (interface{}, error)
 // toolMemorySave saves a memory.
 func (s *MCPServer) toolMemorySave(args json.RawMessage) (interface{}, error) {
 	var params struct {
-		Type      string   `json:"type"`
-		Scope     string   `json:"scope"`
-		Key       string   `json:"key"`
-		Value     string   `json:"value"`
-		Confidence float64 `json:"confidence"`
-		Tags      []string `json:"tags"`
+		Type       string   `json:"type"`
+		Scope      string   `json:"scope"`
+		ProfileID  string   `json:"profile_id"`
+		Key        string   `json:"key"`
+		Value      string   `json:"value"`
+		Confidence float64  `json:"confidence"`
+		Tags       []string `json:"tags"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return nil, err
 	}
 
+	profileID := params.ProfileID
+	if profileID == "" {
+		profileID = s.cfg.Profile.ID
+	}
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	memory := &core.Memory{
-		Type:      core.MemoryType(params.Type),
-		Scope:     core.Scope(params.Scope),
-		Key:       params.Key,
-		Value:     params.Value,
-		Tags:      params.Tags,
+		ProfileID:  profileID,
+		Type:       core.MemoryType(params.Type),
+		Scope:      core.Scope(params.Scope),
+		Key:        params.Key,
+		Value:      params.Value,
+		Tags:       params.Tags,
 		Confidence: params.Confidence,
 		Metadata: core.Metadata{
 			Source: "claude_code",
@@ -380,9 +394,10 @@ func (s *MCPServer) toolMemorySave(args json.RawMessage) (interface{}, error) {
 // toolMemoryQuery searches memories.
 func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 	var params struct {
-		Query string `json:"query"`
-		TopK  int    `json:"topk"`
-		Scope string `json:"scope"`
+		Query     string `json:"query"`
+		TopK      int    `json:"topk"`
+		Scope     string `json:"scope"`
+		ProfileID string `json:"profile_id"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return nil, err
@@ -392,14 +407,23 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 		params.TopK = 5
 	}
 
+	profileID := params.ProfileID
+	if profileID == "" {
+		profileID = s.cfg.Profile.ID
+	}
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	var results []*core.QueryResult
 
 	// Try semantic search if AI components are available
 	if s.useSemanticSearch && s.recall != nil {
 		queryReq := &core.QueryRequest{
-			Query: params.Query,
-			TopK:  params.TopK,
-			Scope: core.Scope(params.Scope),
+			Query:     params.Query,
+			TopK:      params.TopK,
+			Scope:     core.Scope(params.Scope),
+			ProfileID: profileID,
 		}
 		queryResp, err := s.recall.Query(queryReq)
 		if err == nil && len(queryResp.Results) > 0 {
@@ -411,8 +435,9 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 	if len(results) == 0 {
 		recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
 		listReq := &core.ListRequest{
-			Scope: core.Scope(params.Scope),
-			Limit: 100,
+			Scope:     core.Scope(params.Scope),
+			Limit:     100,
+			ProfileID: profileID,
 		}
 
 		resp, err := recall.List(listReq)
@@ -454,8 +479,9 @@ func (s *MCPServer) toolMemoryQuery(args json.RawMessage) (interface{}, error) {
 // toolMemoryList lists memories.
 func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 	var params struct {
-		Scope string `json:"scope"`
-		Limit int    `json:"limit"`
+		Scope     string `json:"scope"`
+		Limit     int    `json:"limit"`
+		ProfileID string `json:"profile_id"`
 	}
 	if err := json.Unmarshal(args, &params); err != nil {
 		return nil, err
@@ -465,14 +491,23 @@ func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 		params.Limit = 20
 	}
 
+	profileID := params.ProfileID
+	if profileID == "" {
+		profileID = s.cfg.Profile.ID
+	}
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	var memories []*core.Memory
 	var total int
 
 	// Use recall if available, otherwise create one with nil components
 	if s.recall != nil {
 		resp, err := s.recall.List(&core.ListRequest{
-			Scope: core.Scope(params.Scope),
-			Limit: params.Limit,
+			Scope:     core.Scope(params.Scope),
+			Limit:     params.Limit,
+			ProfileID: profileID,
 		})
 		if err != nil {
 			return nil, err
@@ -482,8 +517,9 @@ func (s *MCPServer) toolMemoryList(args json.RawMessage) (interface{}, error) {
 	} else {
 		recall := core.NewRecall(s.sqliteStore, nil, nil, s.ranker)
 		resp, err := recall.List(&core.ListRequest{
-			Scope: core.Scope(params.Scope),
-			Limit: params.Limit,
+			Scope:     core.Scope(params.Scope),
+			Limit:     params.Limit,
+			ProfileID: profileID,
 		})
 		if err != nil {
 			return nil, err

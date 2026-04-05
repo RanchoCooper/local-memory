@@ -41,12 +41,12 @@ func (m *MockSQLiteStore) GetByID(id string) (*core.Memory, error) {
 	return mem, nil
 }
 
-func (m *MockSQLiteStore) GetByKey(key string) (*core.Memory, error) {
+func (m *MockSQLiteStore) GetByKey(key, profileID string) (*core.Memory, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
 	for _, mem := range m.memories {
-		if mem.Key == key && !mem.Deleted {
+		if mem.Key == key && mem.ProfileID == profileID && !mem.Deleted {
 			return mem, nil
 		}
 	}
@@ -63,6 +63,9 @@ func (m *MockSQLiteStore) List(req *core.ListRequest) ([]*core.Memory, int, erro
 			continue
 		}
 		if req.Scope != "" && mem.Scope != req.Scope {
+			continue
+		}
+		if req.ProfileID != "" && mem.ProfileID != req.ProfileID {
 			continue
 		}
 		result = append(result, mem)

@@ -85,6 +85,7 @@ func (s *Server) Run(addr string) error {
 // --- Request/Response structures ---
 
 type CreateMemoryRequest struct {
+	ProfileID  string   `json:"profile_id"`
 	Type       string   `json:"type"`
 	Scope      string   `json:"scope"`
 	MediaType  string   `json:"media_type"`
@@ -95,9 +96,10 @@ type CreateMemoryRequest struct {
 }
 
 type QueryRequest struct {
-	Query string `json:"query"`
-	TopK  int    `json:"topk"`
-	Scope string `json:"scope"`
+	Query     string `json:"query"`
+	TopK      int    `json:"topk"`
+	Scope     string `json:"scope"`
+	ProfileID string `json:"profile_id"`
 }
 
 type ExtractRequest struct {
@@ -139,13 +141,22 @@ func (s *Server) createMemoryHandler(c *gin.Context) {
 		return
 	}
 
+	profileID := req.ProfileID
+	if profileID == "" {
+		profileID = s.cfg.Profile.ID
+	}
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	memory := &core.Memory{
-		Type:      core.MemoryType(req.Type),
-		Scope:     core.Scope(req.Scope),
-		MediaType: core.MediaType(req.MediaType),
-		Key:       req.Key,
-		Value:     req.Value,
-		Tags:      req.Tags,
+		ProfileID:  profileID,
+		Type:       core.MemoryType(req.Type),
+		Scope:      core.Scope(req.Scope),
+		MediaType:  core.MediaType(req.MediaType),
+		Key:        req.Key,
+		Value:      req.Value,
+		Tags:       req.Tags,
 	}
 
 	if req.Confidence > 0 {
@@ -294,10 +305,19 @@ func (s *Server) queryHandler(c *gin.Context) {
 
 	recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(s.cfg.Decay.Lambda))
 
+	profileID := req.ProfileID
+	if profileID == "" {
+		profileID = s.cfg.Profile.ID
+	}
+	if profileID == "" {
+		profileID = "default"
+	}
+
 	// MVP: simple keyword search
 	listReq := &core.ListRequest{
-		Scope: core.Scope(req.Scope),
-		Limit: 100,
+		Scope:     core.Scope(req.Scope),
+		Limit:     100,
+		ProfileID: profileID,
 	}
 	resp, err := recall.List(listReq)
 	if err != nil {

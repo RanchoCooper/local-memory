@@ -91,7 +91,7 @@ func TestSQLiteStore_SaveAndGetByKey(t *testing.T) {
 		t.Fatalf("Failed to save memory: %v", err)
 	}
 
-	got, err := tdb.store.GetByKey("unique_key_123")
+	got, err := tdb.store.GetByKey("unique_key_123", "default")
 	if err != nil {
 		t.Fatalf("Failed to get by key: %v", err)
 	}

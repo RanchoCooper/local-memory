@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	queryTopK  int
-	queryScope string
+	queryTopK    int
+	queryScope   string
+	queryProfile string
 )
 
 var QueryCmd = &cobra.Command{
@@ -49,12 +50,19 @@ Examples:
 		if queryScope == "" {
 			queryScope = cfg.CLI.DefaultScope
 		}
+		if queryProfile == "" {
+			queryProfile = cfg.Profile.ID
+		}
+		if queryProfile == "" {
+			queryProfile = "default"
+		}
 
 		// List memories and filter by simple matching
 		listReq := &core.ListRequest{
-			Scope:  core.Scope(queryScope),
-			Limit:  100,
-			Offset: 0,
+			Scope:     core.Scope(queryScope),
+			Limit:     100,
+			Offset:    0,
+			ProfileID: queryProfile,
 		}
 
 		recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(cfg.Decay.Lambda))
@@ -92,6 +100,7 @@ Examples:
 func init() {
 	QueryCmd.Flags().IntVar(&queryTopK, "topk", 5, "Number of results to return")
 	QueryCmd.Flags().StringVar(&queryScope, "scope", "", "Scope filter (global, session, agent)")
+	QueryCmd.Flags().StringVar(&queryProfile, "profile", "", "Profile ID filter")
 }
 
 func containsIgnoreCase(s, substr string) bool {

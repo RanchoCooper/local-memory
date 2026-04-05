@@ -174,6 +174,14 @@ func (s *QdrantStore) Search(query []float32, topK int, filter *Filter) ([]Resul
 				},
 			})
 		}
+		if filter.ProfileID != "" {
+			conditions = append(conditions, map[string]any{
+				"key": "profile_id",
+				"match": map[string]any{
+					"keyword": filter.ProfileID,
+				},
+			})
+		}
 		if len(conditions) > 0 {
 			searchReq["filter"] = map[string]any{
 				"must": conditions,

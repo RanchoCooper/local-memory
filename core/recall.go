@@ -42,8 +42,9 @@ func (r *Recall) Query(req *QueryRequest) (*QueryResponse, error) {
 
 	// 2. Build filter conditions
 	filter := &VectorFilter{
-		Scope: string(req.Scope),
-		Tags:  req.Tags,
+		Scope:     string(req.Scope),
+		Tags:      req.Tags,
+		ProfileID: req.ProfileID,
 	}
 
 	// 3. Vector search

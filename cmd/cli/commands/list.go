@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	listScope  string
-	listLimit  int
-	listOffset int
-	listAll    bool
+	listScope   string
+	listLimit   int
+	listOffset  int
+	listAll     bool
+	listProfile string
 )
 
 var ListCmd = &cobra.Command{
@@ -50,6 +51,12 @@ Examples:
 		if listScope == "" {
 			listScope = cfg.CLI.DefaultScope
 		}
+		if listProfile == "" {
+			listProfile = cfg.Profile.ID
+		}
+		if listProfile == "" {
+			listProfile = "default"
+		}
 
 		// Build query request
 		listReq := &core.ListRequest{
@@ -57,6 +64,7 @@ Examples:
 			Limit:          listLimit,
 			Offset:         listOffset,
 			IncludeDeleted: listAll,
+			ProfileID:      listProfile,
 		}
 
 		recall := core.NewRecall(sqliteStore, nil, nil, core.NewRanker(cfg.Decay.Lambda))
@@ -99,4 +107,5 @@ func init() {
 	ListCmd.Flags().IntVar(&listLimit, "limit", 20, "Number of memories to list")
 	ListCmd.Flags().StringVar(&listScope, "scope", "", "Scope filter (global, session, agent)")
 	ListCmd.Flags().IntVar(&listOffset, "offset", 0, "Offset for pagination")
+	ListCmd.Flags().StringVar(&listProfile, "profile", "", "Profile ID filter")
 }
